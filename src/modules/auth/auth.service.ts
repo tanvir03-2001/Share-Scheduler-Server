@@ -184,8 +184,19 @@ export class AuthService {
         user.passwordResetExpires = passwordResetExpires;
         await user.save();
 
-        // In real app, send reset email
-        Logger.info('Password reset token generated', { userId: user._id, email });
+        // Send password reset email
+        try {
+            const emailSent = await emailService.sendPasswordResetEmail(email, passwordResetToken, user.name);
+            if (emailSent) {
+                Logger.info('Password reset email sent successfully', { userId: user._id, email });
+            } else {
+                Logger.error('Failed to send password reset email - email service returned false', { userId: user._id, email });
+                throw new Error('Failed to send password reset email');
+            }
+        } catch (error) {
+            Logger.error('Failed to send password reset email:', error);
+            throw new Error('Failed to send password reset email');
+        }
     }
 
     async resetPassword(token: string, newPassword: string): Promise<void> {
