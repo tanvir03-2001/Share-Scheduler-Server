@@ -13,11 +13,11 @@ export class AuthController {
     // Register a new user
     register = async (req: Request, res: Response): Promise<void> => {
         try {
-            const { email, password, name } = req.body;
+            const { email, password, name, acceptPrivacyPolicy } = req.body;
 
             Logger.info('User registration attempt', { email });
 
-            const result = await this.authService.register({ email, password, name });
+            const result = await this.authService.register({ email, password, name, acceptPrivacyPolicy });
 
             ResponseHelper.success(res, 'User registered successfully', result, 201);
         } catch (error: any) {
