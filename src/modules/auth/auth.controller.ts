@@ -35,7 +35,26 @@ export class AuthController {
 
             const result = await this.authService.login(email, password);
 
-            ResponseHelper.success(res, 'Login successful', result);
+            // Set HTTP-only cookies for tokens
+            res.cookie('access_token', result.accessToken, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'lax',
+                maxAge: 24 * 60 * 60 * 1000, // 1 day
+                path: '/'
+            });
+
+            res.cookie('refresh_token', result.refreshToken, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'lax',
+                maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+                path: '/'
+            });
+
+            // Return user data without tokens
+            const { accessToken, refreshToken, ...userData } = result;
+            ResponseHelper.success(res, 'Login successful', userData);
         } catch (error: any) {
             Logger.error('Login error:', error);
             ResponseHelper.error(res, error.message || 'Login failed', error, 401);
@@ -45,17 +64,22 @@ export class AuthController {
     // Logout user
     logout = async (req: Request, res: Response): Promise<void> => {
         try {
-            const { refreshToken } = req.body;
+            const refreshToken = req.cookies.refresh_token;
 
-            if (!refreshToken) {
-                return ResponseHelper.error(res, 'Refresh token is required', null, 400);
+            if (refreshToken) {
+                await this.authService.logout(refreshToken);
             }
 
-            await this.authService.logout(refreshToken);
+            // Clear cookies
+            res.clearCookie('access_token', { path: '/' });
+            res.clearCookie('refresh_token', { path: '/' });
 
             ResponseHelper.success(res, 'Logout successful');
         } catch (error: any) {
             Logger.error('Logout error:', error);
+            // Clear cookies even if logout fails
+            res.clearCookie('access_token', { path: '/' });
+            res.clearCookie('refresh_token', { path: '/' });
             ResponseHelper.error(res, 'Logout failed', error);
         }
     };
@@ -63,7 +87,7 @@ export class AuthController {
     // Refresh access token
     refreshToken = async (req: Request, res: Response): Promise<void> => {
         try {
-            const { refreshToken } = req.body;
+            const refreshToken = req.cookies.refresh_token;
 
             if (!refreshToken) {
                 return ResponseHelper.error(res, 'Refresh token is required', null, 400);
@@ -73,9 +97,29 @@ export class AuthController {
 
             const result = await this.authService.refreshAccessToken(refreshToken);
 
-            ResponseHelper.success(res, 'Token refreshed successfully', result);
+            // Set new cookies
+            res.cookie('access_token', result.accessToken, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'lax',
+                maxAge: 24 * 60 * 60 * 1000, // 1 day
+                path: '/'
+            });
+
+            res.cookie('refresh_token', result.refreshToken, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'lax',
+                maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+                path: '/'
+            });
+
+            ResponseHelper.success(res, 'Token refreshed successfully');
         } catch (error: any) {
             Logger.error('Token refresh error:', error);
+            // Clear cookies on refresh failure
+            res.clearCookie('access_token', { path: '/' });
+            res.clearCookie('refresh_token', { path: '/' });
             ResponseHelper.error(res, error.message || 'Token refresh failed', error, 401);
         }
     };

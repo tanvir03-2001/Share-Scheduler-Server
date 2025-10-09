@@ -45,13 +45,11 @@ router.post('/resend-verification',
 
 // Token refresh route (public)
 router.post('/refresh-token',
-    ValidationMiddleware.validateRequired(['refreshToken']),
     authController.refreshToken
 );
 
 // Protected routes
 router.post('/logout',
-    ValidationMiddleware.validateRequired(['refreshToken']),
     authController.logout
 );
 

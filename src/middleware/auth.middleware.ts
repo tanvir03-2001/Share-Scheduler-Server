@@ -13,14 +13,19 @@ export interface AuthenticatedRequest extends Request {
 export class AuthMiddleware {
     static authenticate(req: AuthenticatedRequest, res: Response, next: NextFunction): void {
         try {
-            const authHeader = req.headers.authorization;
+            // Try to get token from cookies first, then fallback to Authorization header
+            let token = req.cookies.access_token;
 
-            if (!authHeader) {
-                return ResponseHelper.unauthorized(res, 'Authorization header is required');
+            if (!token) {
+                const authHeader = req.headers.authorization;
+                if (authHeader) {
+                    token = JWTService.extractTokenFromHeader(authHeader);
+                }
             }
 
-            // Extract token from Authorization header
-            const token = JWTService.extractTokenFromHeader(authHeader);
+            if (!token) {
+                return ResponseHelper.unauthorized(res, 'Access token is required');
+            }
 
             // Verify access token
             const payload = JWTService.verifyAccessToken(token);
