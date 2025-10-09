@@ -12,6 +12,8 @@ export interface IUser extends Document {
     passwordResetExpires?: Date;
     isActive: boolean;
     lastLogin?: Date;
+    privacyPolicyAccepted: boolean;
+    privacyPolicyAcceptedAt?: Date;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -65,6 +67,14 @@ const UserSchema = new Schema<IUser>({
         default: true
     },
     lastLogin: {
+        type: Date
+    },
+    privacyPolicyAccepted: {
+        type: Boolean,
+        default: false,
+        required: true
+    },
+    privacyPolicyAcceptedAt: {
         type: Date
     }
 }, {

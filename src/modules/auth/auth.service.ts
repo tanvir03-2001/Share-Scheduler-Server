@@ -24,6 +24,7 @@ export interface RegisterData {
     email: string;
     password: string;
     name: string;
+    acceptPrivacyPolicy: boolean;
 }
 
 export interface LoginResponse {
@@ -48,7 +49,9 @@ export class AuthService {
                     password: await this.hashPassword('admin123'),
                     role: 'admin',
                     isEmailVerified: true,
-                    isActive: true
+                    isActive: true,
+                    privacyPolicyAccepted: true,
+                    privacyPolicyAcceptedAt: new Date()
                 });
                 await testUser.save();
                 Logger.info('Test user initialized', { email: testUser.email });
@@ -59,12 +62,17 @@ export class AuthService {
     }
 
     async register(data: RegisterData): Promise<UserResponse> {
-        const { email, password, name } = data;
+        const { email, password, name, acceptPrivacyPolicy } = data;
 
         // Check if user already exists
         const existingUser = await User.findOne({ email });
         if (existingUser) {
             throw new Error('User with this email already exists');
+        }
+
+        // Validate privacy policy acceptance
+        if (!acceptPrivacyPolicy) {
+            throw new Error('Privacy policy must be accepted to create an account');
         }
 
         // Generate email verification token
@@ -80,7 +88,9 @@ export class AuthService {
             isEmailVerified: false,
             emailVerificationToken,
             emailVerificationExpires,
-            isActive: true
+            isActive: true,
+            privacyPolicyAccepted: true,
+            privacyPolicyAcceptedAt: new Date()
         });
 
         await newUser.save();
