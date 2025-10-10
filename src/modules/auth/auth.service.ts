@@ -1,11 +1,11 @@
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
-import { RefreshToken } from '../../models/RefreshToken.model';
-import { IUser, User } from '../../models/User.model';
 import { emailService } from '../../utils/email.service';
 import { JWTService } from '../../utils/jwt.service';
 import { Logger } from '../../utils/logger';
+import { IUser, User } from '../user/User.model';
 import { RefreshTokenResponse, VerifyEmailResponse } from './auth.types';
+import { RefreshToken } from './RefreshToken.model';
 
 // User interface for backward compatibility
 export interface UserResponse {

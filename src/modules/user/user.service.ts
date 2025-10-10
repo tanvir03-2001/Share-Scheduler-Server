@@ -1,5 +1,5 @@
-import { IUser, User } from '../../models/User.model';
 import { Logger } from '../../utils/logger';
+import { IUser, User } from './User.model';
 
 export interface UserResponse {
     id: string;
