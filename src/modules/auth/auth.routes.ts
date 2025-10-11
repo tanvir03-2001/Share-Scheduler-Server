@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import passport from 'passport';
 import { AuthMiddleware } from '../../middleware/auth.middleware';
 import { ValidationMiddleware } from '../../middleware/validation.middleware';
 import { AuthController } from './auth.controller';
@@ -46,6 +47,16 @@ router.post('/resend-verification',
 // Token refresh route (public)
 router.post('/refresh-token',
     authController.refreshToken
+);
+
+// Facebook OAuth routes
+router.get('/facebook',
+    passport.authenticate('facebook', { scope: ['email', 'public_profile'] })
+);
+
+router.get('/facebook/callback',
+    passport.authenticate('facebook', { failureRedirect: '/login?error=facebook_auth_failed' }),
+    authController.facebookCallback
 );
 
 // Protected routes

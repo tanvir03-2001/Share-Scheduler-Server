@@ -1,143 +1,201 @@
-# Facebook Auto Post Server
+# Facebook Auto Post - Server
 
-Express.js server with TypeScript for the Facebook Auto Post application.
+This is the backend server for the Facebook Auto Post application, built with Express.js, TypeScript, and MongoDB.
 
-## Features
+## 🚀 Features
 
-- ✅ Express.js with TypeScript
-- ✅ JWT-based authentication system
-- ✅ User registration and login
-- ✅ Facebook OAuth integration
-- ✅ MongoDB database with Mongoose
-- ✅ Email service for notifications
-- ✅ Password reset functionality
-- ✅ Middleware for validation and error handling
-- ✅ CORS and security headers
+- **User Authentication**: JWT-based authentication with refresh tokens
+- **Facebook Integration**: OAuth2 authentication and API integration
+- **MongoDB Database**: User data and session management
+- **Email Service**: Email verification and notifications
+- **Security**: Helmet, CORS, and session management
+- **TypeScript**: Full type safety and modern development experience
 
-## Folder Structure
+## 🛠️ Tech Stack
 
-```
-server/
-├── src/
-│   ├── app.ts                 # Main application file
-│   ├── server.ts             # Server configuration
-│   ├── routes/               # Route definitions
-│   │   └── home.routes.ts    # Home routes
-│   ├── utils/                # Utility functions
-│   │   ├── logger.ts         # Logging utility
-│   │   └── response.ts       # Response helper
-│   ├── middleware/           # Custom middleware
-│   │   ├── auth.middleware.ts
-│   │   ├── error.middleware.ts
-│   │   └── validation.middleware.ts
-│   └── modules/              # Feature modules
-│       ├── auth/             # Authentication module
-│       │   ├── auth.controller.ts
-│       │   ├── auth.service.ts
-│       │   ├── auth.routes.ts
-│       │   ├── auth.types.ts
-│       │   └── auth.validator.ts
-│       └── user/             # User management module
-│           ├── user.controller.ts
-│           ├── user.service.ts
-│           └── user.routes.ts
-├── package.json
-├── tsconfig.json
-├── .eslintrc.js
-└── README.md
-```
+- **Runtime**: Node.js
+- **Framework**: Express.js
+- **Language**: TypeScript
+- **Database**: MongoDB with Mongoose
+- **Authentication**: JWT + Passport.js
+- **Email**: Nodemailer
+- **Security**: Helmet, CORS, bcryptjs
 
-## Installation
+## 📋 Prerequisites
 
-1. Install dependencies:
-```bash
-npm install
-```
+- Node.js (v16 or higher)
+- MongoDB (local or cloud instance)
+- Facebook Developer Account
+- Email service (Gmail recommended)
 
-## Development
+## 🔧 Installation
 
-Start the development server:
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd server
+   ```
+
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
+
+3. **Environment Setup**
+   ```bash
+   cp env.example .env
+   ```
+   
+   Edit `.env` file with your configuration:
+   - MongoDB connection string
+   - JWT secrets
+   - Facebook App credentials
+   - Email service credentials
+
+4. **Database Setup**
+   - Make sure MongoDB is running
+   - The application will automatically create necessary collections
+
+## 🚀 Running the Application
+
+### Development Mode
 ```bash
 npm run dev
 ```
 
-The server will start on port 5000 by default.
-
-## Available Scripts
-
-- `npm run dev` - Start development server with hot reload
-- `npm run build` - Build the project
-- `npm start` - Start production server
-- `npm run lint` - Run ESLint
-- `npm run lint:fix` - Fix ESLint errors
-
-## API Endpoints
-
-### Home Routes
-- `GET /` - Server status
-- `GET /health` - Health check
-
-### Authentication Routes (`/api/auth`)
-- `POST /register` - Register new user
-- `POST /login` - User login
-- `POST /logout` - User logout
-- `POST /refresh-token` - Refresh access token
-- `GET /profile` - Get user profile
-- `PUT /profile` - Update user profile
-- `POST /forgot-password` - Request password reset
-- `POST /reset-password` - Reset password
-
-### User Routes (`/api/users`)
-- `GET /` - Get all users (admin only)
-- `GET /:id` - Get user by ID
-- `PUT /:id` - Update user
-- `DELETE /:id` - Delete user (admin only)
-
-### Facebook Routes (`/api/facebook`) - *Coming Soon*
-- Facebook OAuth integration service is implemented
-- Routes will be added in future updates
-
-## Environment Variables
-
-Create a `.env` file in the server root:
-
-```env
-# Server Configuration
-PORT=5000
-NODE_ENV=development
-CLIENT_URL=http://localhost:3000
-
-# Database Configuration
-MONGODB_URI=mongodb://localhost:27017/facebook-auto-post
-
-# JWT Configuration
-JWT_SECRET=your-super-secret-jwt-key-here
-JWT_REFRESH_SECRET=your-super-secret-refresh-key-here
-
-# Email Configuration
-EMAIL_USER=your-email@gmail.com
-EMAIL_PASS=your-app-password
-EMAIL_FROM=your-email@gmail.com
-
-# Facebook App Configuration
-FACEBOOK_APP_ID=your-facebook-app-id
-FACEBOOK_APP_SECRET=your-facebook-app-secret
-FACEBOOK_REDIRECT_URI=http://localhost:5000/api/facebook/auth/callback
+### Production Mode
+```bash
+npm run build
+npm start
 ```
 
-## Default Port
+### Other Commands
+```bash
+# Build TypeScript
+npm run build
 
-The server runs on port **5000** by default.
+# Start with nodemon (development)
+npm run start:watch
 
-## Development Features
+# Lint code
+npm run lint
 
-- **Hot Reload**: Uses ts-node-dev for automatic server restart on file changes
-- **TypeScript**: Full TypeScript support with strict type checking
-- **ESLint**: Code linting and formatting
-- **Error Handling**: Comprehensive error handling middleware
-- **Validation**: Request validation middleware
-- **Authentication**: JWT-based authentication with refresh tokens
-- **Logging**: Structured logging utility
-- **Database**: MongoDB with Mongoose ODM
-- **Email Service**: Gmail SMTP integration for notifications
+# Fix linting issues
+npm run lint:fix
+```
 
+## 📁 Project Structure
+
+```
+server/
+├── src/
+│   ├── app.ts                 # Main application entry point
+│   ├── server.ts             # Server configuration
+│   ├── config/               # Configuration files
+│   │   ├── database.ts       # MongoDB connection
+│   │   └── passport.ts       # Passport.js configuration
+│   ├── middleware/           # Express middleware
+│   │   ├── auth.middleware.ts
+│   │   ├── error.middleware.ts
+│   │   └── validation.middleware.ts
+│   ├── modules/              # Feature modules
+│   │   ├── auth/             # Authentication routes & controllers
+│   │   ├── facebook/         # Facebook integration
+│   │   └── user/             # User management
+│   ├── routes/               # Route definitions
+│   ├── services/             # Business logic services
+│   ├── types/                # TypeScript type definitions
+│   └── utils/                # Utility functions
+├── dist/                     # Compiled JavaScript (generated)
+├── scripts/                  # Utility scripts
+└── package.json
+```
+
+## 🔐 Environment Variables
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `PORT` | Server port | Yes |
+| `NODE_ENV` | Environment (development/production) | Yes |
+| `MONGODB_URI` | MongoDB connection string | Yes |
+| `JWT_SECRET` | JWT signing secret | Yes |
+| `JWT_REFRESH_SECRET` | JWT refresh token secret | Yes |
+| `CLIENT_URL` | Frontend application URL | Yes |
+| `FACEBOOK_APP_ID` | Facebook App ID | Yes |
+| `FACEBOOK_APP_SECRET` | Facebook App Secret | Yes |
+| `SESSION_SECRET` | Session secret for Passport.js | Yes |
+| `EMAIL_HOST` | SMTP server host | Optional |
+| `EMAIL_USER` | SMTP username | Optional |
+| `EMAIL_PASS` | SMTP password | Optional |
+
+## 🔗 API Endpoints
+
+### Authentication
+- `POST /api/auth/register` - User registration
+- `POST /api/auth/login` - User login
+- `POST /api/auth/refresh` - Refresh JWT token
+- `POST /api/auth/logout` - User logout
+- `GET /api/auth/facebook` - Facebook OAuth login
+- `GET /api/auth/facebook/callback` - Facebook OAuth callback
+
+### User Management
+- `GET /api/user/profile` - Get user profile
+- `PUT /api/user/profile` - Update user profile
+- `DELETE /api/user/account` - Delete user account
+
+### Facebook Integration
+- `GET /api/facebook/pages` - Get user's Facebook pages
+- `POST /api/facebook/post` - Create Facebook post
+- `GET /api/facebook/posts` - Get user's posts
+
+## 🚀 Deployment
+
+### Vercel Deployment
+1. Connect your repository to Vercel
+2. Set environment variables in Vercel dashboard
+3. Deploy automatically on push to main branch
+
+### Manual Deployment
+1. Build the application: `npm run build`
+2. Set production environment variables
+3. Start the server: `npm start`
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+1. **MongoDB Connection Error**
+   - Check if MongoDB is running
+   - Verify connection string in `.env`
+
+2. **Facebook OAuth Issues**
+   - Verify Facebook App credentials
+   - Check redirect URIs in Facebook Developer Console
+
+3. **JWT Token Issues**
+   - Ensure JWT secrets are set
+   - Check token expiration settings
+
+4. **Email Service Issues**
+   - Verify SMTP credentials
+   - Check Gmail app password setup
+
+## 📝 Development Notes
+
+- The server runs on port 5000 by default
+- CORS is configured for localhost:3000 (client)
+- All routes are prefixed with `/api`
+- JWT tokens expire in 1 day, refresh tokens in 7 days
+- Facebook integration requires proper app setup in Facebook Developer Console
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Run tests and linting
+5. Submit a pull request
+
+## 📄 License
+
+This project is licensed under the ISC License.

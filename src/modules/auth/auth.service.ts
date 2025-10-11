@@ -120,9 +120,14 @@ export class AuthService {
             throw new Error('Invalid email or password');
         }
 
-        // Verify password using bcrypt
-        if (!await this.verifyPassword(password, user.password)) {
+        // Verify password using bcrypt (only if user has a password)
+        if (user.password && !await this.verifyPassword(password, user.password)) {
             throw new Error('Invalid email or password');
+        }
+
+        // If user doesn't have a password (Facebook login), check if they're trying to login with email/password
+        if (!user.password) {
+            throw new Error('Please use Facebook login for this account');
         }
 
         // Update last login

@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { JWTAuthenticatedRequest } from '../../middleware/auth.middleware';
 import { FacebookService } from '../../services/facebook.service';
 import { Logger } from '../../utils/logger';
 import { ResponseHelper } from '../../utils/response';
@@ -12,9 +13,9 @@ export class FacebookController {
     }
 
     // Generate Facebook OAuth URL for page connection
-    generateAuthUrl = async (req: Request, res: Response): Promise<void> => {
+    generateAuthUrl = async (req: JWTAuthenticatedRequest, res: Response): Promise<void> => {
         try {
-            const userId = (req as any).user?.id;
+            const userId = req.jwtUser?.id;
 
             if (!userId) {
                 return ResponseHelper.unauthorized(res, 'User not authenticated');
@@ -110,9 +111,9 @@ export class FacebookController {
     };
 
     // Get user's connected Facebook pages
-    getConnectedPages = async (req: Request, res: Response): Promise<void> => {
+    getConnectedPages = async (req: JWTAuthenticatedRequest, res: Response): Promise<void> => {
         try {
-            const userId = (req as any).user?.id;
+            const userId = req.jwtUser?.id;
 
             if (!userId) {
                 return ResponseHelper.unauthorized(res, 'User not authenticated');
@@ -136,9 +137,9 @@ export class FacebookController {
     };
 
     // Refresh Facebook pages data
-    refreshPages = async (req: Request, res: Response): Promise<void> => {
+    refreshPages = async (req: JWTAuthenticatedRequest, res: Response): Promise<void> => {
         try {
-            const userId = (req as any).user?.id;
+            const userId = req.jwtUser?.id;
 
             if (!userId) {
                 return ResponseHelper.unauthorized(res, 'User not authenticated');
@@ -188,9 +189,9 @@ export class FacebookController {
     };
 
     // Disconnect Facebook pages
-    disconnectPages = async (req: Request, res: Response): Promise<void> => {
+    disconnectPages = async (req: JWTAuthenticatedRequest, res: Response): Promise<void> => {
         try {
-            const userId = (req as any).user?.id;
+            const userId = req.jwtUser?.id;
 
             if (!userId) {
                 return ResponseHelper.unauthorized(res, 'User not authenticated');
@@ -220,9 +221,9 @@ export class FacebookController {
     };
 
     // Get page access token for a specific page
-    getPageAccessToken = async (req: Request, res: Response): Promise<void> => {
+    getPageAccessToken = async (req: JWTAuthenticatedRequest, res: Response): Promise<void> => {
         try {
-            const userId = (req as any).user?.id;
+            const userId = req.jwtUser?.id;
             const { pageId } = req.params;
 
             if (!userId) {

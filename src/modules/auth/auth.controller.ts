@@ -1,13 +1,17 @@
 import { Request, Response } from 'express';
+import { JWTAuthenticatedRequest } from '../../middleware/auth.middleware';
+import { JWTService } from '../../utils/jwt.service';
 import { Logger } from '../../utils/logger';
 import { ResponseHelper } from '../../utils/response';
 import { AuthService } from './auth.service';
 
 export class AuthController {
     private authService: AuthService;
+    private jwtService: JWTService;
 
     constructor() {
         this.authService = new AuthService();
+        this.jwtService = new JWTService();
     }
 
     // Register a new user
@@ -36,20 +40,20 @@ export class AuthController {
             const result = await this.authService.login(email, password);
 
             // Set HTTP-only cookies for tokens
-            res.cookie('access_token', result.accessToken, {
+            const cookieOptions = {
                 httpOnly: true,
                 secure: process.env.NODE_ENV === 'production',
-                sameSite: 'lax',
+                sameSite: (process.env.NODE_ENV === 'production' ? 'none' : 'lax') as 'none' | 'lax',
                 maxAge: 24 * 60 * 60 * 1000, // 1 day
-                path: '/'
-            });
+                path: '/',
+                domain: process.env.NODE_ENV === 'production' ? undefined : undefined // Let browser handle domain
+            };
+
+            res.cookie('access_token', result.accessToken, cookieOptions);
 
             res.cookie('refresh_token', result.refreshToken, {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'lax',
+                ...cookieOptions,
                 maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-                path: '/'
             });
 
             // Return user data without tokens
@@ -125,9 +129,9 @@ export class AuthController {
     };
 
     // Logout from all devices
-    logoutAllDevices = async (req: Request, res: Response): Promise<void> => {
+    logoutAllDevices = async (req: JWTAuthenticatedRequest, res: Response): Promise<void> => {
         try {
-            const userId = (req as any).user?.id;
+            const userId = req.jwtUser?.id;
 
             if (!userId) {
                 return ResponseHelper.unauthorized(res, 'User not authenticated');
@@ -143,9 +147,9 @@ export class AuthController {
     };
 
     // Get user profile
-    getProfile = async (req: Request, res: Response): Promise<void> => {
+    getProfile = async (req: JWTAuthenticatedRequest, res: Response): Promise<void> => {
         try {
-            const userId = (req as any).user?.id;
+            const userId = req.jwtUser?.id;
 
             if (!userId) {
                 return ResponseHelper.unauthorized(res, 'User not authenticated');
@@ -161,9 +165,9 @@ export class AuthController {
     };
 
     // Update user profile
-    updateProfile = async (req: Request, res: Response): Promise<void> => {
+    updateProfile = async (req: JWTAuthenticatedRequest, res: Response): Promise<void> => {
         try {
-            const userId = (req as any).user?.id;
+            const userId = req.jwtUser?.id;
             const updateData = req.body;
 
             if (!userId) {
@@ -240,6 +244,64 @@ export class AuthController {
         } catch (error: any) {
             Logger.error('Resend verification email error:', error);
             ResponseHelper.error(res, error.message || 'Failed to resend verification email', error, 400);
+        }
+    };
+
+    // Facebook OAuth callback
+    facebookCallback = async (req: Request, res: Response): Promise<void> => {
+        try {
+            const user = (req as any).user;
+
+            if (!user) {
+                return ResponseHelper.error(res, 'Facebook authentication failed', null, 401);
+            }
+
+            Logger.info('Facebook authentication successful', { userId: user._id, email: user.email });
+
+            // Generate JWT tokens
+            const tokens = JWTService.generateTokenPair({
+                userId: (user._id as any).toString(),
+                email: user.email,
+                role: user.role
+            });
+
+            // Store refresh token in database
+            const { RefreshToken } = await import('./RefreshToken.model');
+            const refreshTokenDoc = new RefreshToken({
+                token: tokens.refreshToken,
+                userId: user._id,
+                expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
+            });
+            await refreshTokenDoc.save();
+
+            // Update last login
+            user.lastLogin = new Date();
+            await user.save();
+
+            // Set HTTP-only cookies
+            const cookieOptions = {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: (process.env.NODE_ENV === 'production' ? 'none' : 'lax') as 'none' | 'lax',
+                maxAge: 24 * 60 * 60 * 1000, // 1 day
+                path: '/',
+                domain: process.env.NODE_ENV === 'production' ? undefined : undefined
+            };
+
+            res.cookie('access_token', tokens.accessToken, cookieOptions);
+            res.cookie('refresh_token', tokens.refreshToken, {
+                ...cookieOptions,
+                maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+            });
+
+            // Redirect to frontend with success
+            const frontendUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+            res.redirect(`${frontendUrl}/dashboard?auth=success`);
+
+        } catch (error: any) {
+            Logger.error('Facebook callback error:', error);
+            const frontendUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+            res.redirect(`${frontendUrl}/login?error=facebook_auth_failed`);
         }
     };
 }

@@ -6,7 +6,11 @@
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/app.ts",
     "build": "tsc",
-    "start": "node dist/app.js",
+    "start": "node start-server.js",
+    "start:watch": "nodemon dist/app.js",
+    "start:prod": "node start-server.js",
+    "start:direct": "node dist/app.js",
+    "cleanup-indexes": "node scripts/cleanup-indexes.js",
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix",
     "vercel-build": "npm run build"
@@ -22,20 +26,27 @@
   "dependencies": {
     "@types/bcryptjs": "^2.4.6",
     "@types/cookie-parser": "^1.4.9",
+    "@types/express-session": "^1.18.2",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/mongoose": "^5.11.96",
+    "@types/node-fetch": "^2.6.11",
     "@types/nodemailer": "^7.0.2",
+    "@types/passport": "^1.0.17",
+    "@types/passport-facebook": "^3.0.3",
     "bcryptjs": "^3.0.2",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
+    "express-session": "^1.18.2",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.19.1",
     "morgan": "^1.10.0",
-    "node-fetch": "^3.3.2",
-    "nodemailer": "^7.0.9"
+    "node-fetch": "^2.7.0",
+    "nodemailer": "^7.0.9",
+    "passport": "^0.7.0",
+    "passport-facebook": "^3.0.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
@@ -45,6 +56,7 @@
     "@typescript-eslint/eslint-plugin": "^6.15.0",
     "@typescript-eslint/parser": "^6.15.0",
     "eslint": "^8.56.0",
+    "nodemon": "^3.0.2",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.3.3"
   }

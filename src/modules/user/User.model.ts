@@ -14,7 +14,7 @@ export interface FacebookPage {
 export interface IUser extends Document {
     email: string;
     name: string;
-    password: string;
+    password?: string; // Made optional for Facebook login
     role: 'user' | 'admin';
     isEmailVerified: boolean;
     emailVerificationToken?: string;
@@ -26,9 +26,12 @@ export interface IUser extends Document {
     privacyPolicyAccepted: boolean;
     privacyPolicyAcceptedAt?: Date;
     // Facebook integration fields
+    facebookId?: string;
     facebookAccessToken?: string;
     facebookTokenExpiresAt?: Date;
     facebookPages?: FacebookPage[];
+    profilePicture?: string;
+    loginMethod?: 'email' | 'facebook';
     createdAt: Date;
     updatedAt: Date;
 }
@@ -51,7 +54,9 @@ const UserSchema = new Schema<IUser>({
     },
     password: {
         type: String,
-        required: [true, 'Password is required'],
+        required: function () {
+            return this.loginMethod === 'email';
+        },
         minlength: [6, 'Password must be at least 6 characters long']
     },
     role: {
@@ -93,12 +98,25 @@ const UserSchema = new Schema<IUser>({
         type: Date
     },
     // Facebook integration fields
+    facebookId: {
+        type: String,
+        sparse: true,
+        unique: true
+    },
     facebookAccessToken: {
         type: String,
         sparse: true
     },
     facebookTokenExpiresAt: {
         type: Date
+    },
+    profilePicture: {
+        type: String
+    },
+    loginMethod: {
+        type: String,
+        enum: ['email', 'facebook'],
+        default: 'email'
     },
     facebookPages: [{
         id: {

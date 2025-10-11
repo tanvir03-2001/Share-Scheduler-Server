@@ -1,6 +1,4 @@
-// Dynamic import for node-fetch (ESM module)
-const fetch = (...args: Parameters<typeof import('node-fetch').default>) =>
-    import('node-fetch').then(({ default: fetch }) => fetch(...args));
+import fetch from 'node-fetch';
 
 export interface FacebookPageData {
     id: string;
@@ -31,7 +29,7 @@ export class FacebookService {
     constructor() {
         this.appId = process.env.FACEBOOK_APP_ID || '';
         this.appSecret = process.env.FACEBOOK_APP_SECRET || '';
-        this.redirectUri = process.env.FACEBOOK_REDIRECT_URI || '';
+        this.redirectUri = process.env.FACEBOOK_REDIRECT_URI || 'http://localhost:5000/api/facebook/callback';
 
         // Don't throw error in constructor, check when methods are called
     }
@@ -48,12 +46,8 @@ export class FacebookService {
     generateAuthUrl(state?: string): string {
         this.validateConfiguration();
         const scopes = [
-            'pages_manage_posts',
-            'pages_read_engagement',
-            'pages_show_list',
-            'pages_manage_metadata',
-            'pages_read_user_content',
-            'pages_read_insights'
+            'email',
+            'public_profile'
         ].join(',');
 
         const params = new URLSearchParams({

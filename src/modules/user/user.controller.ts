@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { JWTAuthenticatedRequest } from '../../middleware/auth.middleware';
 import { Logger } from '../../utils/logger';
 import { ResponseHelper } from '../../utils/response';
 import { UserService } from './user.service';
@@ -22,7 +23,7 @@ export class UserController {
     };
 
     // Get user by ID
-    getUserById = async (req: Request, res: Response): Promise<void> => {
+    getUserById = async (req: JWTAuthenticatedRequest, res: Response): Promise<void> => {
         try {
             const { id } = req.params;
             const user = await this.userService.getUserById(id);
@@ -39,7 +40,7 @@ export class UserController {
     };
 
     // Update user
-    updateUser = async (req: Request, res: Response): Promise<void> => {
+    updateUser = async (req: JWTAuthenticatedRequest, res: Response): Promise<void> => {
         try {
             const { id } = req.params;
             const updateData = req.body;
