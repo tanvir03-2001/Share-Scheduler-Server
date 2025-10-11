@@ -10,11 +10,12 @@ import { database } from './config/database';
 
 // Import routes
 import authRoutes from './modules/auth/auth.routes';
+import facebookRoutes from './modules/facebook/facebook.routes';
 import userRoutes from './modules/user/user.routes';
 import homeRoutes from './routes/home.routes';
 
 // Load environment variables
-dotenv.config();
+dotenv.config({ path: '.env' });
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -22,7 +23,11 @@ const PORT = process.env.PORT || 5000;
 // Middleware
 app.use(helmet());
 app.use(cors({
-    origin: process.env.CLIENT_URL || 'http://localhost:3000',
+    origin: [
+        process.env.CLIENT_URL || 'http://localhost:3000',
+        'https://client-two-iota-21.vercel.app',
+        'http://localhost:3000'
+    ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
@@ -36,6 +41,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/', homeRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/facebook', facebookRoutes);
 
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {

@@ -5,11 +5,12 @@ Express.js server with TypeScript for the Facebook Auto Post application.
 ## Features
 
 - ✅ Express.js with TypeScript
-- ✅ ESLint configuration
-- ✅ ts-node-dev for development
-- ✅ Modular folder structure
-- ✅ Authentication system
-- ✅ User management
+- ✅ JWT-based authentication system
+- ✅ User registration and login
+- ✅ Facebook OAuth integration
+- ✅ MongoDB database with Mongoose
+- ✅ Email service for notifications
+- ✅ Password reset functionality
 - ✅ Middleware for validation and error handling
 - ✅ CORS and security headers
 
@@ -80,6 +81,7 @@ The server will start on port 5000 by default.
 - `POST /register` - Register new user
 - `POST /login` - User login
 - `POST /logout` - User logout
+- `POST /refresh-token` - Refresh access token
 - `GET /profile` - Get user profile
 - `PUT /profile` - Update user profile
 - `POST /forgot-password` - Request password reset
@@ -91,13 +93,36 @@ The server will start on port 5000 by default.
 - `PUT /:id` - Update user
 - `DELETE /:id` - Delete user (admin only)
 
+### Facebook Routes (`/api/facebook`) - *Coming Soon*
+- Facebook OAuth integration service is implemented
+- Routes will be added in future updates
+
 ## Environment Variables
 
 Create a `.env` file in the server root:
 
-```
+```env
+# Server Configuration
 PORT=5000
 NODE_ENV=development
+CLIENT_URL=http://localhost:3000
+
+# Database Configuration
+MONGODB_URI=mongodb://localhost:27017/facebook-auto-post
+
+# JWT Configuration
+JWT_SECRET=your-super-secret-jwt-key-here
+JWT_REFRESH_SECRET=your-super-secret-refresh-key-here
+
+# Email Configuration
+EMAIL_USER=your-email@gmail.com
+EMAIL_PASS=your-app-password
+EMAIL_FROM=your-email@gmail.com
+
+# Facebook App Configuration
+FACEBOOK_APP_ID=your-facebook-app-id
+FACEBOOK_APP_SECRET=your-facebook-app-secret
+FACEBOOK_REDIRECT_URI=http://localhost:5000/api/facebook/auth/callback
 ```
 
 ## Default Port
@@ -111,6 +136,8 @@ The server runs on port **5000** by default.
 - **ESLint**: Code linting and formatting
 - **Error Handling**: Comprehensive error handling middleware
 - **Validation**: Request validation middleware
-- **Authentication**: JWT-based authentication (placeholder implementation)
+- **Authentication**: JWT-based authentication with refresh tokens
 - **Logging**: Structured logging utility
+- **Database**: MongoDB with Mongoose ODM
+- **Email Service**: Gmail SMTP integration for notifications
 

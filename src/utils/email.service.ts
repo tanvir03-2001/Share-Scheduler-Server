@@ -13,23 +13,32 @@ export interface EmailOptions {
 }
 
 export class EmailService {
-    private transporter: nodemailer.Transporter;
+    private transporter: nodemailer.Transporter | null = null;
+    private isConfigured: boolean = false;
 
     constructor() {
-        // Use Gmail service for better compatibility
-        this.transporter = nodemailer.createTransport({
-            service: 'gmail',
-            auth: {
-                user: process.env.EMAIL_USER,
-                pass: process.env.EMAIL_PASS
-            }
-        });
+        // Check if email credentials are configured
+        if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+            this.isConfigured = true;
+            // Use Gmail service for better compatibility
+            this.transporter = nodemailer.createTransport({
+                service: 'gmail',
+                auth: {
+                    user: process.env.EMAIL_USER,
+                    pass: process.env.EMAIL_PASS
+                }
+            });
 
-        // Verify connection configuration
-        this.verifyConnection();
+            // Verify connection configuration
+            this.verifyConnection();
+        } else {
+            Logger.warn('Email service not configured. Email functionality will be disabled.');
+        }
     }
 
     private async verifyConnection(): Promise<void> {
+        if (!this.transporter) return;
+
         try {
             await this.transporter.verify();
             Logger.info('Email service connected successfully');
@@ -39,6 +48,11 @@ export class EmailService {
     }
 
     async sendEmail(options: EmailOptions): Promise<boolean> {
+        if (!this.isConfigured || !this.transporter) {
+            Logger.warn('Email service not configured. Cannot send email.');
+            return false;
+        }
+
         try {
             const mailOptions = {
                 from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
@@ -62,6 +76,11 @@ export class EmailService {
     }
 
     async sendVerificationEmail(email: string, verificationToken: string, userName: string): Promise<boolean> {
+        if (!this.isConfigured || !this.transporter) {
+            Logger.warn('Email service not configured. Cannot send verification email.');
+            return false;
+        }
+
         const frontendUrl = process.env.FRONTEND_URL || process.env.CLIENT_URL || 'http://localhost:3000';
         const verificationUrl = `${frontendUrl}/auth/verify-email?token=${verificationToken}`;
 
@@ -166,6 +185,11 @@ export class EmailService {
     }
 
     async sendPasswordResetEmail(email: string, resetToken: string, userName: string): Promise<boolean> {
+        if (!this.isConfigured || !this.transporter) {
+            Logger.warn('Email service not configured. Cannot send password reset email.');
+            return false;
+        }
+
         const frontendUrl = process.env.FRONTEND_URL || process.env.CLIENT_URL || 'http://localhost:3000';
         const resetUrl = `${frontendUrl}/auth/reset-password?token=${resetToken}`;
 

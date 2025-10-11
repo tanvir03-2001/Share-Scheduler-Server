@@ -1,5 +1,16 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
+export interface FacebookPage {
+    id: string;
+    name: string;
+    category: string;
+    accessToken: string;
+    picture?: string;
+    followersCount?: number;
+    tasks?: string[];
+    connectedAt: Date;
+}
+
 export interface IUser extends Document {
     email: string;
     name: string;
@@ -14,6 +25,10 @@ export interface IUser extends Document {
     lastLogin?: Date;
     privacyPolicyAccepted: boolean;
     privacyPolicyAcceptedAt?: Date;
+    // Facebook integration fields
+    facebookAccessToken?: string;
+    facebookTokenExpiresAt?: Date;
+    facebookPages?: FacebookPage[];
     createdAt: Date;
     updatedAt: Date;
 }
@@ -76,7 +91,46 @@ const UserSchema = new Schema<IUser>({
     },
     privacyPolicyAcceptedAt: {
         type: Date
-    }
+    },
+    // Facebook integration fields
+    facebookAccessToken: {
+        type: String,
+        sparse: true
+    },
+    facebookTokenExpiresAt: {
+        type: Date
+    },
+    facebookPages: [{
+        id: {
+            type: String,
+            required: true
+        },
+        name: {
+            type: String,
+            required: true
+        },
+        category: {
+            type: String,
+            required: true
+        },
+        accessToken: {
+            type: String,
+            required: true
+        },
+        picture: {
+            type: String
+        },
+        followersCount: {
+            type: Number
+        },
+        tasks: [{
+            type: String
+        }],
+        connectedAt: {
+            type: Date,
+            default: Date.now
+        }
+    }]
 }, {
     timestamps: true, // Automatically adds createdAt and updatedAt
     toJSON: {
@@ -90,10 +144,10 @@ const UserSchema = new Schema<IUser>({
     }
 });
 
-// Indexes for better performance
-UserSchema.index({ email: 1 });
-UserSchema.index({ emailVerificationToken: 1 });
-UserSchema.index({ passwordResetToken: 1 });
+// Indexes for better performance (removed duplicate indexes)
+// email index is already created by unique: true
+UserSchema.index({ emailVerificationToken: 1 }, { sparse: true });
+UserSchema.index({ passwordResetToken: 1 }, { sparse: true });
 UserSchema.index({ isActive: 1 });
 
 // Pre-save middleware to update timestamps

@@ -22,8 +22,7 @@ const RefreshTokenSchema = new Schema<IRefreshToken>({
     },
     expiresAt: {
         type: Date,
-        required: true,
-        index: { expireAfterSeconds: 0 } // TTL index for automatic cleanup
+        required: true
     },
     isRevoked: {
         type: Boolean,
@@ -33,9 +32,9 @@ const RefreshTokenSchema = new Schema<IRefreshToken>({
     timestamps: true
 });
 
-// Indexes for better performance
-RefreshTokenSchema.index({ token: 1 });
+// Indexes for better performance (removed duplicate indexes)
+// token index is already created by unique: true
 RefreshTokenSchema.index({ userId: 1 });
-RefreshTokenSchema.index({ expiresAt: 1 });
+RefreshTokenSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 }); // TTL index for automatic cleanup
 
 export const RefreshToken = mongoose.model<IRefreshToken>('RefreshToken', RefreshTokenSchema);

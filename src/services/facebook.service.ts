@@ -1,4 +1,6 @@
-import fetch from 'node-fetch';
+// Dynamic import for node-fetch (ESM module)
+const fetch = (...args: Parameters<typeof import('node-fetch').default>) =>
+    import('node-fetch').then(({ default: fetch }) => fetch(...args));
 
 export interface FacebookPageData {
     id: string;
@@ -31,8 +33,12 @@ export class FacebookService {
         this.appSecret = process.env.FACEBOOK_APP_SECRET || '';
         this.redirectUri = process.env.FACEBOOK_REDIRECT_URI || '';
 
+        // Don't throw error in constructor, check when methods are called
+    }
+
+    private validateConfiguration(): void {
         if (!this.appId || !this.appSecret) {
-            throw new Error('Facebook App ID and Secret must be configured');
+            throw new Error('Facebook App ID and Secret must be configured. Please set FACEBOOK_APP_ID and FACEBOOK_APP_SECRET in your environment variables.');
         }
     }
 
@@ -40,17 +46,13 @@ export class FacebookService {
      * Generate Facebook OAuth URL for page permissions
      */
     generateAuthUrl(state?: string): string {
+        this.validateConfiguration();
         const scopes = [
             'pages_manage_posts',
             'pages_read_engagement',
             'pages_show_list',
             'pages_manage_metadata',
             'pages_read_user_content',
-            'pages_manage_ads',
-            'pages_manage_instant_articles',
-            'pages_messaging',
-            'pages_messaging_subscriptions',
-            'pages_manage_events',
             'pages_read_insights'
         ].join(',');
 
@@ -69,6 +71,7 @@ export class FacebookService {
      * Exchange authorization code for access token
      */
     async exchangeCodeForToken(code: string): Promise<{ access_token: string; token_type: string; expires_in: number }> {
+        this.validateConfiguration();
         const params = new URLSearchParams({
             client_id: this.appId,
             client_secret: this.appSecret,
@@ -95,6 +98,7 @@ export class FacebookService {
      * Get long-lived access token
      */
     async getLongLivedToken(shortLivedToken: string): Promise<{ access_token: string; token_type: string; expires_in: number }> {
+        this.validateConfiguration();
         const params = new URLSearchParams({
             grant_type: 'fb_exchange_token',
             client_id: this.appId,
@@ -171,6 +175,7 @@ export class FacebookService {
      * Verify if access token is valid
      */
     async verifyAccessToken(accessToken: string): Promise<{ valid: boolean; user_id?: string; app_id?: string }> {
+        this.validateConfiguration();
         const params = new URLSearchParams({
             input_token: accessToken,
             access_token: `${this.appId}|${this.appSecret}`
@@ -233,8 +238,8 @@ export class FacebookService {
             access_token: pageAccessToken,
             metric,
             period: 'day',
-            since: Math.floor(Date.now() / 1000) - (7 * 24 * 60 * 60), // Last 7 days
-            until: Math.floor(Date.now() / 1000)
+            since: (Math.floor(Date.now() / 1000) - (7 * 24 * 60 * 60)).toString(), // Last 7 days
+            until: Math.floor(Date.now() / 1000).toString()
         });
 
         const response = await fetch(`https://graph.facebook.com/v18.0/${pageId}/insights?${params.toString()}`, {

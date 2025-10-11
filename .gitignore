@@ -208,3 +208,4 @@ uploads/
 *.pem
 *.key
 *.crt
+.vercel

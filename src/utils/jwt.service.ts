@@ -2,9 +2,9 @@ import jwt from 'jsonwebtoken';
 import { TokenPayload } from '../modules/auth/auth.types';
 
 export class JWTService {
-    private static readonly ACCESS_TOKEN_SECRET = process.env.JWT_ACCESS_SECRET || 'your-access-token-secret-key';
+    private static readonly ACCESS_TOKEN_SECRET = process.env.JWT_SECRET || 'your-access-token-secret-key';
     private static readonly REFRESH_TOKEN_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-token-secret-key';
-    private static readonly ACCESS_TOKEN_EXPIRES_IN = process.env.JWT_ACCESS_EXPIRES_IN || '1d'; // 1 day
+    private static readonly ACCESS_TOKEN_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1d'; // 1 day
     private static readonly REFRESH_TOKEN_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '7d'; // 7 days
 
     /**
@@ -20,7 +20,7 @@ export class JWTService {
             expiresIn: this.ACCESS_TOKEN_EXPIRES_IN,
             issuer: 'facebook-auto-post-app',
             audience: 'facebook-auto-post-users'
-        });
+        } as jwt.SignOptions);
     }
 
     /**
@@ -36,7 +36,7 @@ export class JWTService {
             expiresIn: this.REFRESH_TOKEN_EXPIRES_IN,
             issuer: 'facebook-auto-post-app',
             audience: 'facebook-auto-post-users'
-        });
+        } as jwt.SignOptions);
     }
 
     /**
