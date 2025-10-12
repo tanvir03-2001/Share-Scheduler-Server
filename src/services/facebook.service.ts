@@ -91,6 +91,7 @@ export class FacebookService {
             'instagram_basic',
             'instagram_content_publish',
             'instagram_manage_insights'
+
         ].join(',');
 
         const params = new URLSearchParams({
