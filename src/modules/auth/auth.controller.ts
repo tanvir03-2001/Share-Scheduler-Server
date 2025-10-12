@@ -74,16 +74,26 @@ export class AuthController {
                 await this.authService.logout(refreshToken);
             }
 
-            // Clear cookies
-            res.clearCookie('access_token', { path: '/' });
-            res.clearCookie('refresh_token', { path: '/' });
+            // Clear cookies with consistent options
+            const clearCookieOptions = {
+                path: '/',
+                domain: process.env.NODE_ENV === 'production' ? undefined : undefined
+            };
+
+            res.clearCookie('access_token', clearCookieOptions);
+            res.clearCookie('refresh_token', clearCookieOptions);
 
             ResponseHelper.success(res, 'Logout successful');
         } catch (error: any) {
             Logger.error('Logout error:', error);
             // Clear cookies even if logout fails
-            res.clearCookie('access_token', { path: '/' });
-            res.clearCookie('refresh_token', { path: '/' });
+            const clearCookieOptions = {
+                path: '/',
+                domain: process.env.NODE_ENV === 'production' ? undefined : undefined
+            };
+
+            res.clearCookie('access_token', clearCookieOptions);
+            res.clearCookie('refresh_token', clearCookieOptions);
             ResponseHelper.error(res, 'Logout failed', error);
         }
     };
@@ -101,29 +111,34 @@ export class AuthController {
 
             const result = await this.authService.refreshAccessToken(refreshToken);
 
-            // Set new cookies
-            res.cookie('access_token', result.accessToken, {
+            // Set new cookies with consistent options
+            const cookieOptions = {
                 httpOnly: true,
                 secure: process.env.NODE_ENV === 'production',
-                sameSite: 'lax',
+                sameSite: (process.env.NODE_ENV === 'production' ? 'none' : 'lax') as 'none' | 'lax',
                 maxAge: 24 * 60 * 60 * 1000, // 1 day
-                path: '/'
-            });
+                path: '/',
+                domain: process.env.NODE_ENV === 'production' ? undefined : undefined // Let browser handle domain
+            };
+
+            res.cookie('access_token', result.accessToken, cookieOptions);
 
             res.cookie('refresh_token', result.refreshToken, {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'lax',
+                ...cookieOptions,
                 maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-                path: '/'
             });
 
             ResponseHelper.success(res, 'Token refreshed successfully');
         } catch (error: any) {
             Logger.error('Token refresh error:', error);
             // Clear cookies on refresh failure
-            res.clearCookie('access_token', { path: '/' });
-            res.clearCookie('refresh_token', { path: '/' });
+            const clearCookieOptions = {
+                path: '/',
+                domain: process.env.NODE_ENV === 'production' ? undefined : undefined
+            };
+
+            res.clearCookie('access_token', clearCookieOptions);
+            res.clearCookie('refresh_token', clearCookieOptions);
             ResponseHelper.error(res, error.message || 'Token refresh failed', error, 401);
         }
     };

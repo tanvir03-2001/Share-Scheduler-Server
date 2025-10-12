@@ -49,9 +49,14 @@ router.post('/refresh-token',
     authController.refreshToken
 );
 
-// Facebook OAuth routes
+// Facebook Business OAuth routes
 router.get('/facebook',
-    passport.authenticate('facebook', { scope: ['email', 'public_profile'] })
+    passport.authenticate('facebook', {
+        scope: process.env.FACEBOOK_BUSINESS_SCOPES?.split(',') || [
+            'public_profile',
+            'email'
+        ]
+    })
 );
 
 router.get('/facebook/callback',

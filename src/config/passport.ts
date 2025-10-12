@@ -6,13 +6,16 @@ import { User } from '../modules/user/User.model';
 
 const authService = new AuthService();
 
-// Configure Facebook OAuth Strategy
+// Configure Facebook Business OAuth Strategy
 passport.use(new FacebookStrategy({
     clientID: process.env.FACEBOOK_APP_ID || '',
     clientSecret: process.env.FACEBOOK_APP_SECRET || '',
     callbackURL: process.env.FACEBOOK_CALLBACK_URL || '/api/auth/facebook/callback',
     profileFields: ['id', 'emails', 'name', 'picture.type(large)'],
-    scope: ['email', 'public_profile']
+    scope: process.env.FACEBOOK_BUSINESS_SCOPES?.split(',') || [
+        'public_profile',
+        'email'
+    ]
 }, async (accessToken, refreshToken, profile, done) => {
     try {
         console.log('Facebook profile:', profile);

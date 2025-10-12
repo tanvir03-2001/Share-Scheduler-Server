@@ -28,11 +28,15 @@ app.use(cors({
     origin: [
         process.env.CLIENT_URL || 'http://localhost:3000',
         'https://client-two-iota-21.vercel.app',
-        'http://localhost:3000'
+        'http://localhost:3000',
+        'http://127.0.0.1:3000',
+        // Add any other frontend URLs you need
+        /^https:\/\/.*\.vercel\.app$/, // Allow all Vercel deployments
+        /^https:\/\/.*\.netlify\.app$/ // Allow all Netlify deployments
     ],
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie', 'X-Requested-With'],
     exposedHeaders: ['Set-Cookie'],
     optionsSuccessStatus: 200
 }));

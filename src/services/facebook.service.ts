@@ -35,19 +35,33 @@ export class FacebookService {
     }
 
     private validateConfiguration(): void {
-        if (!this.appId || !this.appSecret) {
-            throw new Error('Facebook App ID and Secret must be configured. Please set FACEBOOK_APP_ID and FACEBOOK_APP_SECRET in your environment variables.');
+        if (!this.appId) {
+            throw new Error('Facebook App ID is not configured. Please set FACEBOOK_APP_ID in your environment variables.');
+        }
+        if (!this.appSecret) {
+            throw new Error('Facebook App Secret is not configured. Please set FACEBOOK_APP_SECRET in your environment variables.');
+        }
+        if (!this.redirectUri) {
+            throw new Error('Facebook Redirect URI is not configured. Please set FACEBOOK_REDIRECT_URI in your environment variables.');
         }
     }
 
     /**
-     * Generate Facebook OAuth URL for user connection
+     * Generate Facebook Business OAuth URL for user connection
      */
     generateUserAuthUrl(state?: string): string {
         this.validateConfiguration();
-        const scopes = [
+        const scopes = process.env.FACEBOOK_BUSINESS_SCOPES?.split(',') || [
+            'public_profile',
             'email',
-            'public_profile'
+            'pages_manage_posts',
+            'pages_read_engagement',
+            'pages_show_list',
+            'pages_manage_metadata',
+            'pages_read_user_content',
+            'instagram_basic',
+            'instagram_content_publish',
+            'instagram_manage_insights'
         ].join(',');
 
         const params = new URLSearchParams({
@@ -62,14 +76,21 @@ export class FacebookService {
     }
 
     /**
-     * Generate Facebook OAuth URL for page permissions (requires user to be connected first)
+     * Generate Facebook Business OAuth URL for page permissions (requires user to be connected first)
      */
     generatePageAuthUrl(state?: string): string {
         this.validateConfiguration();
-        const scopes = [
+        const scopes = process.env.FACEBOOK_BUSINESS_SCOPES?.split(',') || [
+            'public_profile',
+            'email',
             'pages_manage_posts',
             'pages_read_engagement',
-            'pages_show_list'
+            'pages_show_list',
+            'pages_manage_metadata',
+            'pages_read_user_content',
+            'instagram_basic',
+            'instagram_content_publish',
+            'instagram_manage_insights'
         ].join(',');
 
         const params = new URLSearchParams({
@@ -292,6 +313,189 @@ export class FacebookService {
         if (!response.ok) {
             const error = await response.text();
             throw new Error(`Failed to get page insights: ${error}`);
+        }
+
+        return await response.json();
+    }
+
+    /**
+     * Get Instagram accounts connected to a Facebook page
+     */
+    async getInstagramAccounts(pageAccessToken: string, pageId: string): Promise<any[]> {
+        const params = new URLSearchParams({
+            access_token: pageAccessToken,
+            fields: 'id,username,name,profile_picture_url,biography,followers_count,follows_count,media_count'
+        });
+
+        const response = await fetch(`https://graph.facebook.com/v18.0/${pageId}/instagram_accounts?${params.toString()}`, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            const error = await response.text();
+            throw new Error(`Failed to get Instagram accounts: ${error}`);
+        }
+
+        const data = await response.json() as { data: any[] };
+        return data.data;
+    }
+
+    /**
+     * Upload video to Instagram (for Reels)
+     */
+    async uploadInstagramVideo(instagramAccessToken: string, videoUrl: string, caption?: string): Promise<{ id: string }> {
+        // Step 1: Create media container
+        const containerData: any = {
+            media_type: 'REELS',
+            video_url: videoUrl,
+            access_token: instagramAccessToken
+        };
+
+        if (caption) {
+            containerData.caption = caption;
+        }
+
+        const containerResponse = await fetch(`https://graph.facebook.com/v18.0/me/media`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(containerData)
+        });
+
+        if (!containerResponse.ok) {
+            const error = await containerResponse.text();
+            throw new Error(`Failed to create Instagram media container: ${error}`);
+        }
+
+        const container = await containerResponse.json() as { id: string };
+
+        // Step 2: Publish the media
+        const publishData = {
+            creation_id: container.id,
+            access_token: instagramAccessToken
+        };
+
+        const publishResponse = await fetch(`https://graph.facebook.com/v18.0/me/media_publish`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(publishData)
+        });
+
+        if (!publishResponse.ok) {
+            const error = await publishResponse.text();
+            throw new Error(`Failed to publish Instagram media: ${error}`);
+        }
+
+        return await publishResponse.json() as { id: string };
+    }
+
+    /**
+     * Upload photo to Instagram
+     */
+    async uploadInstagramPhoto(instagramAccessToken: string, imageUrl: string, caption?: string): Promise<{ id: string }> {
+        // Step 1: Create media container
+        const containerData: any = {
+            image_url: imageUrl,
+            access_token: instagramAccessToken
+        };
+
+        if (caption) {
+            containerData.caption = caption;
+        }
+
+        const containerResponse = await fetch(`https://graph.facebook.com/v18.0/me/media`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(containerData)
+        });
+
+        if (!containerResponse.ok) {
+            const error = await containerResponse.text();
+            throw new Error(`Failed to create Instagram media container: ${error}`);
+        }
+
+        const container = await containerResponse.json() as { id: string };
+
+        // Step 2: Publish the media
+        const publishData = {
+            creation_id: container.id,
+            access_token: instagramAccessToken
+        };
+
+        const publishResponse = await fetch(`https://graph.facebook.com/v18.0/me/media_publish`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(publishData)
+        });
+
+        if (!publishResponse.ok) {
+            const error = await publishResponse.text();
+            throw new Error(`Failed to publish Instagram media: ${error}`);
+        }
+
+        return await publishResponse.json() as { id: string };
+    }
+
+    /**
+     * Get Instagram media insights
+     */
+    async getInstagramMediaInsights(instagramAccessToken: string, mediaId: string): Promise<any> {
+        const params = new URLSearchParams({
+            access_token: instagramAccessToken,
+            metric: 'impressions,reach,likes,comments,shares,saves,plays,profile_visits,website_clicks'
+        });
+
+        const response = await fetch(`https://graph.facebook.com/v18.0/${mediaId}/insights?${params.toString()}`, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            const error = await response.text();
+            throw new Error(`Failed to get Instagram media insights: ${error}`);
+        }
+
+        return await response.json();
+    }
+
+    /**
+     * Get Instagram account insights
+     */
+    async getInstagramAccountInsights(instagramAccessToken: string, instagramAccountId: string): Promise<any> {
+        const params = new URLSearchParams({
+            access_token: instagramAccessToken,
+            metric: 'impressions,reach,profile_views,website_clicks',
+            period: 'day',
+            since: (Math.floor(Date.now() / 1000) - (7 * 24 * 60 * 60)).toString(), // Last 7 days
+            until: Math.floor(Date.now() / 1000).toString()
+        });
+
+        const response = await fetch(`https://graph.facebook.com/v18.0/${instagramAccountId}/insights?${params.toString()}`, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            const error = await response.text();
+            throw new Error(`Failed to get Instagram account insights: ${error}`);
         }
 
         return await response.json();

@@ -13,6 +13,7 @@ JWT_REFRESH_EXPIRES_IN=7d
 
 # Client Configuration
 CLIENT_URL=http://localhost:3000
+# For local development, also supports: http://127.0.0.1:3000
 # For production, also add: https://client-two-iota-21.vercel.app
 
 # Facebook App Configuration
@@ -20,6 +21,10 @@ FACEBOOK_APP_ID=your-facebook-app-id-here
 FACEBOOK_APP_SECRET=your-facebook-app-secret-here
 FACEBOOK_REDIRECT_URI=http://localhost:5000/api/facebook/callback
 FACEBOOK_CALLBACK_URL=http://localhost:5000/api/auth/facebook/callback
+
+# Facebook Business API Configuration
+FACEBOOK_BUSINESS_API_VERSION=v18.0
+FACEBOOK_BUSINESS_SCOPES=public_profile,email
 
 # Session Configuration (for Passport.js)
 SESSION_SECRET=your-session-secret-key-here-change-this-in-production

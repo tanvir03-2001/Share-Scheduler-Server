@@ -17,5 +17,13 @@ router.post('/pages/refresh', AuthMiddleware.authenticate, facebookController.re
 router.delete('/pages/disconnect', AuthMiddleware.authenticate, facebookController.disconnectPages);
 router.delete('/user/disconnect', AuthMiddleware.authenticate, facebookController.disconnectUser);
 router.get('/pages/:pageId/access-token', AuthMiddleware.authenticate, facebookController.getPageAccessToken);
+router.get('/app-info', AuthMiddleware.authenticate, facebookController.getFacebookAppInfo);
+
+// Instagram/Reels routes
+router.get('/pages/:pageId/instagram-accounts', AuthMiddleware.authenticate, facebookController.getInstagramAccounts);
+router.post('/instagram/reel/upload', AuthMiddleware.authenticate, facebookController.uploadInstagramReel);
+router.post('/instagram/photo/upload', AuthMiddleware.authenticate, facebookController.uploadInstagramPhoto);
+router.get('/instagram/media/:mediaId/insights', AuthMiddleware.authenticate, facebookController.getInstagramMediaInsights);
+router.get('/instagram/account/:instagramAccountId/insights', AuthMiddleware.authenticate, facebookController.getInstagramAccountInsights);
 
 export default router;
