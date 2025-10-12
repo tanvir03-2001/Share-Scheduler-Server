@@ -1,6 +1,7 @@
 import passport from 'passport';
 import { Strategy as FacebookStrategy } from 'passport-facebook';
 import { AuthService } from '../modules/auth/auth.service';
+import { FacebookUser } from '../modules/facebook/FacebookUser.model';
 import { User } from '../modules/user/User.model';
 
 const authService = new AuthService();
@@ -16,13 +17,17 @@ passport.use(new FacebookStrategy({
     try {
         console.log('Facebook profile:', profile);
 
-        // Check if user already exists with this Facebook ID
-        let user = await User.findOne({ facebookId: profile.id });
+        // Check if Facebook user already exists
+        let facebookUser = await FacebookUser.findOne({ facebookId: profile.id });
 
-        if (user) {
-            // Update access token if user exists
-            user.facebookAccessToken = accessToken;
-            await user.save();
+        if (facebookUser) {
+            // Update access token if Facebook user exists
+            facebookUser.accessToken = accessToken;
+            facebookUser.lastUsedAt = new Date();
+            await facebookUser.save();
+
+            // Get the main user
+            const user = await User.findById(facebookUser.userId);
             return done(null, user);
         }
 
@@ -30,19 +35,30 @@ passport.use(new FacebookStrategy({
         if (profile.emails && profile.emails.length > 0) {
             const existingUser = await User.findOne({ email: profile.emails[0].value });
             if (existingUser) {
-                // Link Facebook account to existing user
-                existingUser.facebookId = profile.id;
-                existingUser.facebookAccessToken = accessToken;
+                // Create Facebook user record for existing user
+                const newFacebookUser = new FacebookUser({
+                    userId: existingUser._id,
+                    facebookId: profile.id,
+                    facebookName: `${profile.name?.givenName || ''} ${profile.name?.familyName || ''}`.trim(),
+                    facebookEmail: profile.emails[0].value,
+                    accessToken: accessToken,
+                    profilePicture: profile.photos?.[0]?.value || '',
+                    isActive: true
+                });
+                await newFacebookUser.save();
+
+                // Update main user
                 existingUser.isEmailVerified = true; // Facebook email is verified
+                existingUser.profilePicture = profile.photos?.[0]?.value || '';
+                existingUser.loginMethod = 'facebook';
                 await existingUser.save();
+
                 return done(null, existingUser);
             }
         }
 
         // Create new user
         const newUser = new User({
-            facebookId: profile.id,
-            facebookAccessToken: accessToken,
             email: profile.emails?.[0]?.value || '',
             name: `${profile.name?.givenName || ''} ${profile.name?.familyName || ''}`.trim(),
             isEmailVerified: true, // Facebook email is verified
@@ -51,6 +67,19 @@ passport.use(new FacebookStrategy({
         });
 
         await newUser.save();
+
+        // Create Facebook user record
+        const newFacebookUser = new FacebookUser({
+            userId: newUser._id,
+            facebookId: profile.id,
+            facebookName: newUser.name,
+            facebookEmail: newUser.email,
+            accessToken: accessToken,
+            profilePicture: newUser.profilePicture,
+            isActive: true
+        });
+        await newFacebookUser.save();
+
         return done(null, newUser);
 
     } catch (error) {

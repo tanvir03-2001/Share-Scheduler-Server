@@ -1,15 +1,5 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
-export interface FacebookPage {
-    id: string;
-    name: string;
-    category: string;
-    accessToken: string;
-    picture?: string;
-    followersCount?: number;
-    tasks?: string[];
-    connectedAt: Date;
-}
 
 export interface IUser extends Document {
     email: string;
@@ -25,11 +15,7 @@ export interface IUser extends Document {
     lastLogin?: Date;
     privacyPolicyAccepted: boolean;
     privacyPolicyAcceptedAt?: Date;
-    // Facebook integration fields
-    facebookId?: string;
-    facebookAccessToken?: string;
-    facebookTokenExpiresAt?: Date;
-    facebookPages?: FacebookPage[];
+    // Facebook integration fields (now handled by separate models)
     profilePicture?: string;
     loginMethod?: 'email' | 'facebook';
     createdAt: Date;
@@ -97,19 +83,7 @@ const UserSchema = new Schema<IUser>({
     privacyPolicyAcceptedAt: {
         type: Date
     },
-    // Facebook integration fields
-    facebookId: {
-        type: String,
-        sparse: true,
-        unique: true
-    },
-    facebookAccessToken: {
-        type: String,
-        sparse: true
-    },
-    facebookTokenExpiresAt: {
-        type: Date
-    },
+    // Facebook integration fields (now handled by separate models)
     profilePicture: {
         type: String
     },
@@ -117,38 +91,7 @@ const UserSchema = new Schema<IUser>({
         type: String,
         enum: ['email', 'facebook'],
         default: 'email'
-    },
-    facebookPages: [{
-        id: {
-            type: String,
-            required: true
-        },
-        name: {
-            type: String,
-            required: true
-        },
-        category: {
-            type: String,
-            required: true
-        },
-        accessToken: {
-            type: String,
-            required: true
-        },
-        picture: {
-            type: String
-        },
-        followersCount: {
-            type: Number
-        },
-        tasks: [{
-            type: String
-        }],
-        connectedAt: {
-            type: Date,
-            default: Date.now
-        }
-    }]
+    }
 }, {
     timestamps: true, // Automatically adds createdAt and updatedAt
     toJSON: {

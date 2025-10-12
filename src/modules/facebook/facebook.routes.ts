@@ -6,13 +6,16 @@ const router = Router();
 const facebookController = new FacebookController();
 
 // Facebook OAuth routes
-router.get('/auth-url', AuthMiddleware.authenticate, facebookController.generateAuthUrl);
+router.get('/user/auth-url', AuthMiddleware.authenticate, facebookController.generateUserAuthUrl);
+router.get('/page/auth-url', AuthMiddleware.authenticate, facebookController.generatePageAuthUrl);
 router.get('/callback', facebookController.handleCallback);
 
-// Facebook pages management routes (all require authentication)
+// Facebook connection status and management routes (all require authentication)
+router.get('/status', AuthMiddleware.authenticate, facebookController.getFacebookConnectionStatus);
 router.get('/pages', AuthMiddleware.authenticate, facebookController.getConnectedPages);
 router.post('/pages/refresh', AuthMiddleware.authenticate, facebookController.refreshPages);
 router.delete('/pages/disconnect', AuthMiddleware.authenticate, facebookController.disconnectPages);
+router.delete('/user/disconnect', AuthMiddleware.authenticate, facebookController.disconnectUser);
 router.get('/pages/:pageId/access-token', AuthMiddleware.authenticate, facebookController.getPageAccessToken);
 
 export default router;

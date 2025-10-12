@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/app.ts",
     "build": "tsc",
+    "deploy": "npm run build && vercel --prod",
     "start": "node start-server.js",
     "start:watch": "nodemon dist/app.js",
     "start:prod": "node start-server.js",

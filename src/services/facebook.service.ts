@@ -41,13 +41,35 @@ export class FacebookService {
     }
 
     /**
-     * Generate Facebook OAuth URL for page permissions
+     * Generate Facebook OAuth URL for user connection
      */
-    generateAuthUrl(state?: string): string {
+    generateUserAuthUrl(state?: string): string {
         this.validateConfiguration();
         const scopes = [
             'email',
             'public_profile'
+        ].join(',');
+
+        const params = new URLSearchParams({
+            client_id: this.appId,
+            redirect_uri: this.redirectUri,
+            scope: scopes,
+            response_type: 'code',
+            ...(state && { state })
+        });
+
+        return `https://www.facebook.com/v18.0/dialog/oauth?${params.toString()}`;
+    }
+
+    /**
+     * Generate Facebook OAuth URL for page permissions (requires user to be connected first)
+     */
+    generatePageAuthUrl(state?: string): string {
+        this.validateConfiguration();
+        const scopes = [
+            'pages_manage_posts',
+            'pages_read_engagement',
+            'pages_show_list'
         ].join(',');
 
         const params = new URLSearchParams({
@@ -113,6 +135,30 @@ export class FacebookService {
         }
 
         return await response.json() as { access_token: string; token_type: string; expires_in: number };
+    }
+
+    /**
+     * Get Facebook user information
+     */
+    async getFacebookUserInfo(userAccessToken: string): Promise<{ id: string; name: string; email?: string; picture?: { data: { url: string } } }> {
+        const params = new URLSearchParams({
+            access_token: userAccessToken,
+            fields: 'id,name,email,picture'
+        });
+
+        const response = await fetch(`https://graph.facebook.com/v18.0/me?${params.toString()}`, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            const error = await response.text();
+            throw new Error(`Failed to fetch Facebook user info: ${error}`);
+        }
+
+        return await response.json() as { id: string; name: string; email?: string; picture?: { data: { url: string } } };
     }
 
     /**

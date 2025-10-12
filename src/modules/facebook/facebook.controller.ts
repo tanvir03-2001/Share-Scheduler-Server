@@ -4,6 +4,8 @@ import { FacebookService } from '../../services/facebook.service';
 import { Logger } from '../../utils/logger';
 import { ResponseHelper } from '../../utils/response';
 import { User } from '../user/User.model';
+import { FacebookPage } from './FacebookPage.model';
+import { FacebookUser } from './FacebookUser.model';
 
 export class FacebookController {
     private facebookService: FacebookService;
@@ -12,8 +14,8 @@ export class FacebookController {
         this.facebookService = new FacebookService();
     }
 
-    // Generate Facebook OAuth URL for page connection
-    generateAuthUrl = async (req: JWTAuthenticatedRequest, res: Response): Promise<void> => {
+    // Generate Facebook OAuth URL for user connection
+    generateUserAuthUrl = async (req: JWTAuthenticatedRequest, res: Response): Promise<void> => {
         try {
             const userId = req.jwtUser?.id;
 
@@ -21,16 +23,50 @@ export class FacebookController {
                 return ResponseHelper.unauthorized(res, 'User not authenticated');
             }
 
-            // Generate state parameter with user ID for security
-            const state = Buffer.from(JSON.stringify({ userId })).toString('base64');
-            const authUrl = this.facebookService.generateAuthUrl(state);
+            // Check if user already has Facebook connection
+            const existingFacebookUser = await FacebookUser.findOne({ userId });
+            if (existingFacebookUser) {
+                return ResponseHelper.error(res, 'Facebook account already connected', null, 400);
+            }
 
-            Logger.info('Facebook auth URL generated', { userId });
+            // Generate state parameter with user ID and connection type for security
+            const state = Buffer.from(JSON.stringify({ userId, type: 'user' })).toString('base64');
+            const authUrl = this.facebookService.generateUserAuthUrl(state);
 
-            ResponseHelper.success(res, 'Facebook auth URL generated successfully', { authUrl });
+            Logger.info('Facebook user auth URL generated', { userId });
+
+            ResponseHelper.success(res, 'Facebook user auth URL generated successfully', { authUrl });
         } catch (error: any) {
-            Logger.error('Generate Facebook auth URL error:', error);
-            ResponseHelper.error(res, error.message || 'Failed to generate Facebook auth URL', error);
+            Logger.error('Generate Facebook user auth URL error:', error);
+            ResponseHelper.error(res, error.message || 'Failed to generate Facebook user auth URL', error);
+        }
+    };
+
+    // Generate Facebook OAuth URL for page connection
+    generatePageAuthUrl = async (req: JWTAuthenticatedRequest, res: Response): Promise<void> => {
+        try {
+            const userId = req.jwtUser?.id;
+
+            if (!userId) {
+                return ResponseHelper.unauthorized(res, 'User not authenticated');
+            }
+
+            // Check if user has Facebook connection first
+            const facebookUser = await FacebookUser.findOne({ userId, isActive: true });
+            if (!facebookUser) {
+                return ResponseHelper.error(res, 'Please connect your Facebook account first', null, 400);
+            }
+
+            // Generate state parameter with user ID and connection type for security
+            const state = Buffer.from(JSON.stringify({ userId, type: 'page' })).toString('base64');
+            const authUrl = this.facebookService.generatePageAuthUrl(state);
+
+            Logger.info('Facebook page auth URL generated', { userId });
+
+            ResponseHelper.success(res, 'Facebook page auth URL generated successfully', { authUrl });
+        } catch (error: any) {
+            Logger.error('Generate Facebook page auth URL error:', error);
+            ResponseHelper.error(res, error.message || 'Failed to generate Facebook page auth URL', error);
         }
     };
 
@@ -56,11 +92,13 @@ export class FacebookController {
             }
 
             const userId = stateData.userId;
-            if (!userId) {
+            const connectionType = stateData.type;
+
+            if (!userId || !connectionType) {
                 return ResponseHelper.error(res, 'Invalid state parameter', null, 400);
             }
 
-            Logger.info('Facebook OAuth callback received', { userId });
+            Logger.info('Facebook OAuth callback received', { userId, connectionType });
 
             // Exchange code for access token
             const tokenData = await this.facebookService.exchangeCodeForToken(code as string);
@@ -68,45 +106,140 @@ export class FacebookController {
             // Get long-lived token
             const longLivedToken = await this.facebookService.getLongLivedToken(tokenData.access_token);
 
-            // Get user's Facebook pages
-            const pages = await this.facebookService.getUserPages(longLivedToken.access_token);
+            if (connectionType === 'user') {
+                // Handle user connection
+                await this.handleUserConnection(userId, longLivedToken.access_token, longLivedToken.expires_in);
 
-            // Update user with Facebook data
-            const user = await User.findById(userId);
-            if (!user) {
-                return ResponseHelper.error(res, 'User not found', null, 404);
+                // Redirect to frontend callback page
+                const frontendCallbackUrl = `${process.env.CLIENT_URL}/dashboard/facebook-callback?success=true&type=user`;
+                res.redirect(frontendCallbackUrl);
+            } else if (connectionType === 'page') {
+                // Handle page connection
+                const pages = await this.handlePageConnection(userId, longLivedToken.access_token);
+
+                // Redirect to frontend callback page
+                const frontendCallbackUrl = `${process.env.CLIENT_URL}/dashboard/facebook-callback?success=true&type=page&pages=${pages.length}`;
+                res.redirect(frontendCallbackUrl);
+            } else {
+                throw new Error('Invalid connection type');
             }
-
-            // Store Facebook data in user document
-            user.facebookAccessToken = longLivedToken.access_token;
-            user.facebookTokenExpiresAt = new Date(Date.now() + (longLivedToken.expires_in * 1000));
-            user.facebookPages = pages.map(page => ({
-                id: page.id,
-                name: page.name,
-                category: page.category,
-                accessToken: page.access_token,
-                picture: page.picture?.data?.url,
-                followersCount: page.followers_count,
-                tasks: page.tasks,
-                connectedAt: new Date()
-            }));
-
-            await user.save();
-
-            Logger.info('Facebook pages connected successfully', {
-                userId,
-                pagesCount: pages.length,
-                pageNames: pages.map(p => p.name)
-            });
-
-            // Redirect to frontend callback page
-            const frontendCallbackUrl = `${process.env.CLIENT_URL}/dashboard/facebook-callback?success=true&pages=${pages.length}`;
-            res.redirect(frontendCallbackUrl);
         } catch (error: any) {
             Logger.error('Facebook OAuth callback error:', error);
             // Redirect to frontend callback page with error
-            const frontendCallbackUrl = `${process.env.CLIENT_URL}/dashboard/facebook-callback?error=true&message=${encodeURIComponent(error.message || 'Failed to connect Facebook pages')}`;
+            const frontendCallbackUrl = `${process.env.CLIENT_URL}/dashboard/facebook-callback?error=true&message=${encodeURIComponent(error.message || 'Failed to connect Facebook')}`;
             res.redirect(frontendCallbackUrl);
+        }
+    };
+
+    // Handle Facebook user connection
+    private async handleUserConnection(userId: string, accessToken: string, expiresIn: number): Promise<void> {
+        // Get Facebook user information
+        const facebookUserInfo = await this.facebookService.getFacebookUserInfo(accessToken);
+
+        // Check if user exists
+        const user = await User.findById(userId);
+        if (!user) {
+            throw new Error('User not found');
+        }
+
+        // Create or update Facebook user record
+        const facebookUser = await FacebookUser.findOneAndUpdate(
+            { userId },
+            {
+                facebookId: facebookUserInfo.id,
+                facebookName: facebookUserInfo.name,
+                facebookEmail: facebookUserInfo.email,
+                accessToken,
+                tokenExpiresAt: new Date(Date.now() + (expiresIn * 1000)),
+                profilePicture: facebookUserInfo.picture?.data?.url,
+                isActive: true,
+                lastUsedAt: new Date()
+            },
+            { upsert: true, new: true }
+        );
+
+        Logger.info('Facebook user connected successfully', {
+            userId,
+            facebookId: facebookUserInfo.id,
+            facebookName: facebookUserInfo.name
+        });
+    }
+
+    // Handle Facebook page connection
+    private async handlePageConnection(userId: string, accessToken: string): Promise<any[]> {
+        // Check if user has Facebook connection
+        const facebookUser = await FacebookUser.findOne({ userId, isActive: true });
+        if (!facebookUser) {
+            throw new Error('Facebook user connection not found');
+        }
+
+        // Get user's Facebook pages
+        const pages = await this.facebookService.getUserPages(accessToken);
+
+        // Store pages in database
+        const savedPages = [];
+        for (const page of pages) {
+            const facebookPage = await FacebookPage.findOneAndUpdate(
+                { userId, pageId: page.id },
+                {
+                    facebookUserId: facebookUser._id,
+                    pageName: page.name,
+                    category: page.category,
+                    accessToken: page.access_token,
+                    picture: page.picture?.data?.url,
+                    followersCount: page.followers_count,
+                    tasks: page.tasks,
+                    isActive: true,
+                    lastUsedAt: new Date()
+                },
+                { upsert: true, new: true }
+            );
+            savedPages.push(facebookPage);
+        }
+
+        Logger.info('Facebook pages connected successfully', {
+            userId,
+            pagesCount: pages.length,
+            pageNames: pages.map(p => p.name)
+        });
+
+        return savedPages;
+    }
+
+    // Get user's Facebook connection status
+    getFacebookConnectionStatus = async (req: JWTAuthenticatedRequest, res: Response): Promise<void> => {
+        try {
+            const userId = req.jwtUser?.id;
+
+            if (!userId) {
+                return ResponseHelper.unauthorized(res, 'User not authenticated');
+            }
+
+            const facebookUser = await FacebookUser.findOne({ userId, isActive: true });
+            const connectedPages = await FacebookPage.find({ userId, isActive: true });
+
+            ResponseHelper.success(res, 'Facebook connection status retrieved successfully', {
+                isConnected: !!facebookUser,
+                facebookUser: facebookUser ? {
+                    facebookId: facebookUser.facebookId,
+                    facebookName: facebookUser.facebookName,
+                    facebookEmail: facebookUser.facebookEmail,
+                    profilePicture: facebookUser.profilePicture,
+                    connectedAt: facebookUser.connectedAt
+                } : null,
+                pages: connectedPages.map(page => ({
+                    pageId: page.pageId,
+                    pageName: page.pageName,
+                    category: page.category,
+                    picture: page.picture,
+                    followersCount: page.followersCount,
+                    connectedAt: page.connectedAt
+                })),
+                totalPages: connectedPages.length
+            });
+        } catch (error: any) {
+            Logger.error('Get Facebook connection status error:', error);
+            ResponseHelper.error(res, error.message || 'Failed to get Facebook connection status', error);
         }
     };
 
@@ -119,15 +252,17 @@ export class FacebookController {
                 return ResponseHelper.unauthorized(res, 'User not authenticated');
             }
 
-            const user = await User.findById(userId);
-            if (!user) {
-                return ResponseHelper.error(res, 'User not found', null, 404);
-            }
-
-            const connectedPages = user.facebookPages || [];
+            const connectedPages = await FacebookPage.find({ userId, isActive: true });
 
             ResponseHelper.success(res, 'Connected Facebook pages retrieved successfully', {
-                pages: connectedPages,
+                pages: connectedPages.map(page => ({
+                    pageId: page.pageId,
+                    pageName: page.pageName,
+                    category: page.category,
+                    picture: page.picture,
+                    followersCount: page.followersCount,
+                    connectedAt: page.connectedAt
+                })),
                 totalPages: connectedPages.length
             });
         } catch (error: any) {
@@ -145,42 +280,56 @@ export class FacebookController {
                 return ResponseHelper.unauthorized(res, 'User not authenticated');
             }
 
-            const user = await User.findById(userId);
-            if (!user || !user.facebookAccessToken) {
+            const facebookUser = await FacebookUser.findOne({ userId, isActive: true });
+            if (!facebookUser) {
                 return ResponseHelper.error(res, 'No Facebook connection found', null, 404);
             }
 
             // Check if token is still valid
-            const tokenValidation = await this.facebookService.verifyAccessToken(user.facebookAccessToken);
+            const tokenValidation = await this.facebookService.verifyAccessToken(facebookUser.accessToken);
             if (!tokenValidation.valid) {
                 return ResponseHelper.error(res, 'Facebook access token is invalid or expired', null, 401);
             }
 
             // Get updated pages data
-            const pages = await this.facebookService.getUserPages(user.facebookAccessToken);
+            const pages = await this.facebookService.getUserPages(facebookUser.accessToken);
 
-            // Update user's Facebook pages
-            user.facebookPages = pages.map(page => ({
-                id: page.id,
-                name: page.name,
-                category: page.category,
-                accessToken: page.access_token,
-                picture: page.picture?.data?.url,
-                followersCount: page.followers_count,
-                tasks: page.tasks,
-                connectedAt: new Date()
-            }));
-
-            await user.save();
+            // Update pages in database
+            const updatedPages = [];
+            for (const page of pages) {
+                const facebookPage = await FacebookPage.findOneAndUpdate(
+                    { userId, pageId: page.id },
+                    {
+                        pageName: page.name,
+                        category: page.category,
+                        accessToken: page.access_token,
+                        picture: page.picture?.data?.url,
+                        followersCount: page.followers_count,
+                        tasks: page.tasks,
+                        lastUsedAt: new Date()
+                    },
+                    { new: true }
+                );
+                if (facebookPage) {
+                    updatedPages.push(facebookPage);
+                }
+            }
 
             Logger.info('Facebook pages refreshed successfully', {
                 userId,
-                pagesCount: pages.length
+                pagesCount: updatedPages.length
             });
 
             ResponseHelper.success(res, 'Facebook pages refreshed successfully', {
-                pages: user.facebookPages,
-                message: `Successfully refreshed ${pages.length} Facebook page(s)`
+                pages: updatedPages.map(page => ({
+                    pageId: page.pageId,
+                    pageName: page.pageName,
+                    category: page.category,
+                    picture: page.picture,
+                    followersCount: page.followersCount,
+                    connectedAt: page.connectedAt
+                })),
+                message: `Successfully refreshed ${updatedPages.length} Facebook page(s)`
             });
         } catch (error: any) {
             Logger.error('Refresh Facebook pages error:', error);
@@ -197,17 +346,11 @@ export class FacebookController {
                 return ResponseHelper.unauthorized(res, 'User not authenticated');
             }
 
-            const user = await User.findById(userId);
-            if (!user) {
-                return ResponseHelper.error(res, 'User not found', null, 404);
-            }
-
-            // Clear Facebook data
-            user.facebookAccessToken = undefined;
-            user.facebookTokenExpiresAt = undefined;
-            user.facebookPages = [];
-
-            await user.save();
+            // Deactivate all Facebook pages
+            await FacebookPage.updateMany(
+                { userId },
+                { isActive: false }
+            );
 
             Logger.info('Facebook pages disconnected successfully', { userId });
 
@@ -217,6 +360,37 @@ export class FacebookController {
         } catch (error: any) {
             Logger.error('Disconnect Facebook pages error:', error);
             ResponseHelper.error(res, error.message || 'Failed to disconnect Facebook pages', error);
+        }
+    };
+
+    // Disconnect Facebook user account
+    disconnectUser = async (req: JWTAuthenticatedRequest, res: Response): Promise<void> => {
+        try {
+            const userId = req.jwtUser?.id;
+
+            if (!userId) {
+                return ResponseHelper.unauthorized(res, 'User not authenticated');
+            }
+
+            // Deactivate Facebook user and all pages
+            await FacebookUser.updateOne(
+                { userId },
+                { isActive: false }
+            );
+
+            await FacebookPage.updateMany(
+                { userId },
+                { isActive: false }
+            );
+
+            Logger.info('Facebook user disconnected successfully', { userId });
+
+            ResponseHelper.success(res, 'Facebook account disconnected successfully', {
+                message: 'Facebook account and all pages have been disconnected'
+            });
+        } catch (error: any) {
+            Logger.error('Disconnect Facebook user error:', error);
+            ResponseHelper.error(res, error.message || 'Failed to disconnect Facebook account', error);
         }
     };
 
@@ -234,27 +408,27 @@ export class FacebookController {
                 return ResponseHelper.error(res, 'Page ID is required', null, 400);
             }
 
-            const user = await User.findById(userId);
-            if (!user || !user.facebookAccessToken) {
+            const facebookUser = await FacebookUser.findOne({ userId, isActive: true });
+            if (!facebookUser) {
                 return ResponseHelper.error(res, 'No Facebook connection found', null, 404);
             }
 
             // Find the specific page
-            const page = user.facebookPages?.find(p => p.id === pageId);
+            const page = await FacebookPage.findOne({ userId, pageId, isActive: true });
             if (!page) {
                 return ResponseHelper.error(res, 'Page not found in connected pages', null, 404);
             }
 
             // Get fresh page access token
             const pageAccessToken = await this.facebookService.getPageAccessToken(
-                user.facebookAccessToken,
+                facebookUser.accessToken,
                 pageId
             );
 
             ResponseHelper.success(res, 'Page access token retrieved successfully', {
                 pageId,
                 accessToken: pageAccessToken,
-                pageName: page.name
+                pageName: page.pageName
             });
         } catch (error: any) {
             Logger.error('Get page access token error:', error);
