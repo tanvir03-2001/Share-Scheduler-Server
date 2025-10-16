@@ -87,10 +87,7 @@ export class FacebookService {
             'pages_read_engagement',
             'pages_show_list',
             'pages_manage_metadata',
-            'pages_read_user_content',
-            'instagram_basic',
-            'instagram_content_publish',
-            'instagram_manage_insights'
+            'pages_read_user_content'
 
         ].join(',');
 
@@ -129,7 +126,19 @@ export class FacebookService {
             throw new Error(`Facebook token exchange failed: ${error}`);
         }
 
-        return await response.json() as { access_token: string; token_type: string; expires_in: number };
+        const tokenData = await response.json() as { access_token: string; token_type: string; expires_in: number };
+
+        // Validate the response data
+        if (!tokenData.access_token) {
+            throw new Error('Facebook token exchange failed: No access token received');
+        }
+
+        // Ensure expires_in is a valid number, default to 1 hour if not provided
+        if (!tokenData.expires_in || isNaN(tokenData.expires_in) || tokenData.expires_in <= 0) {
+            tokenData.expires_in = 3600; // 1 hour in seconds
+        }
+
+        return tokenData;
     }
 
     /**
@@ -156,7 +165,19 @@ export class FacebookService {
             throw new Error(`Facebook long-lived token exchange failed: ${error}`);
         }
 
-        return await response.json() as { access_token: string; token_type: string; expires_in: number };
+        const tokenData = await response.json() as { access_token: string; token_type: string; expires_in: number };
+
+        // Validate the response data
+        if (!tokenData.access_token) {
+            throw new Error('Facebook long-lived token exchange failed: No access token received');
+        }
+
+        // Ensure expires_in is a valid number, default to 60 days if not provided
+        if (!tokenData.expires_in || isNaN(tokenData.expires_in) || tokenData.expires_in <= 0) {
+            tokenData.expires_in = 60 * 24 * 60 * 60; // 60 days in seconds
+        }
+
+        return tokenData;
     }
 
     /**

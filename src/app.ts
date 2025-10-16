@@ -4,7 +4,6 @@ import dotenv from 'dotenv';
 import express from 'express';
 import session from 'express-session';
 import helmet from 'helmet';
-import morgan from 'morgan';
 import passport from './config/passport';
 
 // Import database
@@ -41,7 +40,15 @@ app.use(cors({
     optionsSuccessStatus: 200
 }));
 app.use(cookieParser());
-app.use(morgan('combined'));
+// Simple logging middleware
+app.use((req, res, next) => {
+    const start = Date.now();
+    res.on('finish', () => {
+        const duration = Date.now() - start;
+        console.log(`${req.method} ${req.originalUrl} - ${res.statusCode} (${duration}ms)`);
+    });
+    next();
+});
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

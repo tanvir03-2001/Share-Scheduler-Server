@@ -24,7 +24,7 @@ FACEBOOK_CALLBACK_URL=http://localhost:5000/api/auth/facebook/callback
 
 # Facebook Business API Configuration
 FACEBOOK_BUSINESS_API_VERSION=v18.0
-FACEBOOK_BUSINESS_SCOPES=public_profile,email
+FACEBOOK_BUSINESS_SCOPES=public_profile,email,pages_manage_posts,pages_read_engagement,pages_show_list,pages_manage_metadata,pages_read_user_content
 
 # Session Configuration (for Passport.js)
 SESSION_SECRET=your-session-secret-key-here-change-this-in-production

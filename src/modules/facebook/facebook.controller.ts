@@ -18,6 +18,7 @@ export class FacebookController {
     generateUserAuthUrl = async (req: JWTAuthenticatedRequest, res: Response): Promise<void> => {
         try {
             const userId = req.jwtUser?.id;
+            const { reconnect } = req.query;
 
             if (!userId) {
                 return ResponseHelper.unauthorized(res, 'User not authenticated');
@@ -25,15 +26,15 @@ export class FacebookController {
 
             // Check if user already has Facebook connection
             const existingFacebookUser = await FacebookUser.findOne({ userId });
-            if (existingFacebookUser) {
+            if (existingFacebookUser && !reconnect) {
                 return ResponseHelper.error(res, 'Facebook account already connected', null, 400);
             }
 
             // Generate state parameter with user ID and connection type for security
-            const state = Buffer.from(JSON.stringify({ userId, type: 'user' })).toString('base64');
+            const state = Buffer.from(JSON.stringify({ userId, type: 'user', reconnect: !!reconnect })).toString('base64');
             const authUrl = this.facebookService.generateUserAuthUrl(state);
 
-            Logger.info('Facebook user auth URL generated', { userId });
+            Logger.info('Facebook user auth URL generated', { userId, reconnect: !!reconnect });
 
             ResponseHelper.success(res, 'Facebook user auth URL generated successfully', { authUrl });
         } catch (error: any) {
@@ -93,12 +94,13 @@ export class FacebookController {
 
             const userId = stateData.userId;
             const connectionType = stateData.type;
+            const isReconnect = stateData.reconnect || false;
 
             if (!userId || !connectionType) {
                 return ResponseHelper.error(res, 'Invalid state parameter', null, 400);
             }
 
-            Logger.info('Facebook OAuth callback received', { userId, connectionType });
+            Logger.info('Facebook OAuth callback received', { userId, connectionType, isReconnect });
 
             // Exchange code for access token
             const tokenData = await this.facebookService.exchangeCodeForToken(code as string);
@@ -107,11 +109,19 @@ export class FacebookController {
             const longLivedToken = await this.facebookService.getLongLivedToken(tokenData.access_token);
 
             if (connectionType === 'user') {
-                // Handle user connection
-                await this.handleUserConnection(userId, longLivedToken.access_token, longLivedToken.expires_in);
+                // Handle user connection (this now automatically fetches pages)
+                // Ensure expires_in is valid, default to 60 days if not provided
+                const expiresIn = longLivedToken.expires_in && longLivedToken.expires_in > 0
+                    ? longLivedToken.expires_in
+                    : 60 * 24 * 60 * 60; // 60 days in seconds
+                await this.handleUserConnection(userId, longLivedToken.access_token, expiresIn, isReconnect);
 
-                // Redirect to frontend callback page
-                const frontendCallbackUrl = `${process.env.CLIENT_URL}/dashboard/facebook-callback?success=true&type=user`;
+                // Get the count of pages that were automatically fetched
+                const connectedPages = await FacebookPage.find({ userId, isActive: true });
+                const pagesCount = connectedPages.length;
+
+                // Redirect to frontend callback page with pages count
+                const frontendCallbackUrl = `${process.env.CLIENT_URL}/dashboard/facebook-callback?success=true&type=user&pages=${pagesCount}&reconnect=${isReconnect}`;
                 res.redirect(frontendCallbackUrl);
             } else if (connectionType === 'page') {
                 // Handle page connection
@@ -149,7 +159,7 @@ export class FacebookController {
     };
 
     // Handle Facebook user connection
-    private async handleUserConnection(userId: string, accessToken: string, expiresIn: number): Promise<void> {
+    private async handleUserConnection(userId: string, accessToken: string, expiresIn: number, isReconnect: boolean = false): Promise<void> {
         // Get Facebook user information
         const facebookUserInfo = await this.facebookService.getFacebookUserInfo(accessToken);
 
@@ -157,6 +167,20 @@ export class FacebookController {
         const user = await User.findById(userId);
         if (!user) {
             throw new Error('User not found');
+        }
+
+        // Validate and calculate token expiration date
+        let tokenExpiresAt: Date;
+        if (expiresIn && expiresIn > 0) {
+            tokenExpiresAt = new Date(Date.now() + (expiresIn * 1000));
+        } else {
+            // Default to 60 days from now if expiresIn is invalid
+            tokenExpiresAt = new Date(Date.now() + (60 * 24 * 60 * 60 * 1000));
+        }
+
+        // Validate the date is not invalid
+        if (isNaN(tokenExpiresAt.getTime())) {
+            tokenExpiresAt = new Date(Date.now() + (60 * 24 * 60 * 60 * 1000)); // 60 days fallback
         }
 
         // Create or update Facebook user record
@@ -167,7 +191,7 @@ export class FacebookController {
                 facebookName: facebookUserInfo.name,
                 facebookEmail: facebookUserInfo.email,
                 accessToken,
-                tokenExpiresAt: new Date(Date.now() + (expiresIn * 1000)),
+                tokenExpiresAt,
                 profilePicture: facebookUserInfo.picture?.data?.url,
                 isActive: true,
                 lastUsedAt: new Date()
@@ -178,8 +202,47 @@ export class FacebookController {
         Logger.info('Facebook user connected successfully', {
             userId,
             facebookId: facebookUserInfo.id,
-            facebookName: facebookUserInfo.name
+            facebookName: facebookUserInfo.name,
+            isReconnect
         });
+
+        // Automatically fetch and save user's Facebook pages
+        try {
+            const pages = await this.facebookService.getUserPages(accessToken);
+
+            // Store pages in database
+            const savedPages = [];
+            for (const page of pages) {
+                const facebookPage = await FacebookPage.findOneAndUpdate(
+                    { userId, pageId: page.id },
+                    {
+                        facebookUserId: facebookUser._id,
+                        pageName: page.name,
+                        category: page.category,
+                        accessToken: page.access_token,
+                        picture: page.picture?.data?.url,
+                        followersCount: page.followers_count,
+                        tasks: page.tasks,
+                        isActive: true,
+                        lastUsedAt: new Date()
+                    },
+                    { upsert: true, new: true }
+                );
+                savedPages.push(facebookPage);
+            }
+
+            Logger.info('Facebook pages automatically fetched and saved', {
+                userId,
+                pagesCount: pages.length,
+                pageNames: pages.map(p => p.name)
+            });
+        } catch (pageError: any) {
+            // Log the error but don't fail the user connection
+            Logger.warn('Failed to automatically fetch Facebook pages after user connection', {
+                userId,
+                error: pageError.message
+            });
+        }
     }
 
     // Handle Facebook page connection
@@ -473,10 +536,7 @@ export class FacebookController {
                     'pages_read_engagement',
                     'pages_show_list',
                     'pages_manage_metadata',
-                    'pages_read_user_content',
-                    'instagram_basic',
-                    'instagram_content_publish',
-                    'instagram_manage_insights'
+                    'pages_read_user_content'
                 ],
                 hasAppSecret: !!process.env.FACEBOOK_APP_SECRET,
                 clientUrl: process.env.CLIENT_URL || 'Not configured'
