@@ -1,4 +1,5 @@
 import fetch from 'node-fetch';
+import { RetryUtil } from '../utils/retry.util';
 
 export interface FacebookPageData {
     id: string;
@@ -107,38 +108,45 @@ export class FacebookService {
      */
     async exchangeCodeForToken(code: string): Promise<{ access_token: string; token_type: string; expires_in: number }> {
         this.validateConfiguration();
-        const params = new URLSearchParams({
-            client_id: this.appId,
-            client_secret: this.appSecret,
-            redirect_uri: this.redirectUri,
-            code
-        });
 
-        const response = await fetch(`https://graph.facebook.com/v18.0/oauth/access_token?${params.toString()}`, {
-            method: 'GET',
-            headers: {
-                'Accept': 'application/json'
+        return RetryUtil.executeWithRetry(async () => {
+            const params = new URLSearchParams({
+                client_id: this.appId,
+                client_secret: this.appSecret,
+                redirect_uri: this.redirectUri,
+                code
+            });
+
+            const response = await fetch(`https://graph.facebook.com/v18.0/oauth/access_token?${params.toString()}`, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                const error = await response.text();
+                throw new Error(`Facebook token exchange failed: ${error}`);
             }
+
+            const tokenData = await response.json() as { access_token: string; token_type: string; expires_in: number };
+
+            // Validate the response data
+            if (!tokenData.access_token) {
+                throw new Error('Facebook token exchange failed: No access token received');
+            }
+
+            // Ensure expires_in is a valid number, default to 1 hour if not provided
+            if (!tokenData.expires_in || isNaN(tokenData.expires_in) || tokenData.expires_in <= 0) {
+                tokenData.expires_in = 3600; // 1 hour in seconds
+            }
+
+            return tokenData;
+        }, {
+            maxRetries: 3,
+            baseDelay: 2000,
+            retryCondition: (error) => RetryUtil.isFacebookRateLimitError(error) || RetryUtil.isFacebookTransientError(error)
         });
-
-        if (!response.ok) {
-            const error = await response.text();
-            throw new Error(`Facebook token exchange failed: ${error}`);
-        }
-
-        const tokenData = await response.json() as { access_token: string; token_type: string; expires_in: number };
-
-        // Validate the response data
-        if (!tokenData.access_token) {
-            throw new Error('Facebook token exchange failed: No access token received');
-        }
-
-        // Ensure expires_in is a valid number, default to 1 hour if not provided
-        if (!tokenData.expires_in || isNaN(tokenData.expires_in) || tokenData.expires_in <= 0) {
-            tokenData.expires_in = 3600; // 1 hour in seconds
-        }
-
-        return tokenData;
     }
 
     /**
@@ -146,87 +154,106 @@ export class FacebookService {
      */
     async getLongLivedToken(shortLivedToken: string): Promise<{ access_token: string; token_type: string; expires_in: number }> {
         this.validateConfiguration();
-        const params = new URLSearchParams({
-            grant_type: 'fb_exchange_token',
-            client_id: this.appId,
-            client_secret: this.appSecret,
-            fb_exchange_token: shortLivedToken
-        });
 
-        const response = await fetch(`https://graph.facebook.com/v18.0/oauth/access_token?${params.toString()}`, {
-            method: 'GET',
-            headers: {
-                'Accept': 'application/json'
+        return RetryUtil.executeWithRetry(async () => {
+            const params = new URLSearchParams({
+                grant_type: 'fb_exchange_token',
+                client_id: this.appId,
+                client_secret: this.appSecret,
+                fb_exchange_token: shortLivedToken
+            });
+
+            const response = await fetch(`https://graph.facebook.com/v18.0/oauth/access_token?${params.toString()}`, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                const error = await response.text();
+                throw new Error(`Facebook long-lived token exchange failed: ${error}`);
             }
+
+            const tokenData = await response.json() as { access_token: string; token_type: string; expires_in: number };
+
+            // Validate the response data
+            if (!tokenData.access_token) {
+                throw new Error('Facebook long-lived token exchange failed: No access token received');
+            }
+
+            // Ensure expires_in is a valid number, default to 60 days if not provided
+            if (!tokenData.expires_in || isNaN(tokenData.expires_in) || tokenData.expires_in <= 0) {
+                tokenData.expires_in = 60 * 24 * 60 * 60; // 60 days in seconds
+            }
+
+            return tokenData;
+        }, {
+            maxRetries: 3,
+            baseDelay: 2000,
+            retryCondition: (error) => RetryUtil.isFacebookRateLimitError(error) || RetryUtil.isFacebookTransientError(error)
         });
-
-        if (!response.ok) {
-            const error = await response.text();
-            throw new Error(`Facebook long-lived token exchange failed: ${error}`);
-        }
-
-        const tokenData = await response.json() as { access_token: string; token_type: string; expires_in: number };
-
-        // Validate the response data
-        if (!tokenData.access_token) {
-            throw new Error('Facebook long-lived token exchange failed: No access token received');
-        }
-
-        // Ensure expires_in is a valid number, default to 60 days if not provided
-        if (!tokenData.expires_in || isNaN(tokenData.expires_in) || tokenData.expires_in <= 0) {
-            tokenData.expires_in = 60 * 24 * 60 * 60; // 60 days in seconds
-        }
-
-        return tokenData;
     }
 
     /**
      * Get Facebook user information
      */
     async getFacebookUserInfo(userAccessToken: string): Promise<{ id: string; name: string; email?: string; picture?: { data: { url: string } } }> {
-        const params = new URLSearchParams({
-            access_token: userAccessToken,
-            fields: 'id,name,email,picture'
-        });
+        return RetryUtil.executeWithRetry(async () => {
+            const params = new URLSearchParams({
+                access_token: userAccessToken,
+                fields: 'id,name,email,picture'
+            });
 
-        const response = await fetch(`https://graph.facebook.com/v18.0/me?${params.toString()}`, {
-            method: 'GET',
-            headers: {
-                'Accept': 'application/json'
+            const response = await fetch(`https://graph.facebook.com/v18.0/me?${params.toString()}`, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                const error = await response.text();
+                throw new Error(`Failed to fetch Facebook user info: ${error}`);
             }
+
+            return await response.json() as { id: string; name: string; email?: string; picture?: { data: { url: string } } };
+        }, {
+            maxRetries: 3,
+            baseDelay: 2000,
+            retryCondition: (error) => RetryUtil.isFacebookRateLimitError(error) || RetryUtil.isFacebookTransientError(error)
         });
-
-        if (!response.ok) {
-            const error = await response.text();
-            throw new Error(`Failed to fetch Facebook user info: ${error}`);
-        }
-
-        return await response.json() as { id: string; name: string; email?: string; picture?: { data: { url: string } } };
     }
 
     /**
      * Get user's Facebook pages
      */
     async getUserPages(userAccessToken: string): Promise<FacebookPageData[]> {
-        const params = new URLSearchParams({
-            access_token: userAccessToken,
-            fields: 'id,name,category,access_token,picture,followers_count,tasks'
-        });
+        return RetryUtil.executeWithRetry(async () => {
+            const params = new URLSearchParams({
+                access_token: userAccessToken,
+                fields: 'id,name,category,access_token,picture,followers_count,tasks'
+            });
 
-        const response = await fetch(`https://graph.facebook.com/v18.0/me/accounts?${params.toString()}`, {
-            method: 'GET',
-            headers: {
-                'Accept': 'application/json'
+            const response = await fetch(`https://graph.facebook.com/v18.0/me/accounts?${params.toString()}`, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                const error = await response.text();
+                throw new Error(`Failed to fetch Facebook pages: ${error}`);
             }
+
+            const data = await response.json() as FacebookUserPagesResponse;
+            return data.data;
+        }, {
+            maxRetries: 3,
+            baseDelay: 2000,
+            retryCondition: (error) => RetryUtil.isFacebookRateLimitError(error) || RetryUtil.isFacebookTransientError(error)
         });
-
-        if (!response.ok) {
-            const error = await response.text();
-            throw new Error(`Failed to fetch Facebook pages: ${error}`);
-        }
-
-        const data = await response.json() as FacebookUserPagesResponse;
-        return data.data;
     }
 
     /**

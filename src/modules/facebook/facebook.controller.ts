@@ -3,6 +3,7 @@ import { JWTAuthenticatedRequest } from '../../middleware/auth.middleware';
 import { FacebookService } from '../../services/facebook.service';
 import { Logger } from '../../utils/logger';
 import { ResponseHelper } from '../../utils/response';
+import { RetryUtil } from '../../utils/retry.util';
 import { User } from '../user/User.model';
 import { FacebookPage } from './FacebookPage.model';
 import { FacebookUser } from './FacebookUser.model';
@@ -138,7 +139,15 @@ export class FacebookController {
 
             // Provide more specific error messages
             let errorMessage = 'Failed to connect Facebook';
-            if (error.message.includes('App ID')) {
+            let isRetryable = false;
+
+            if (RetryUtil.isFacebookRateLimitError(error)) {
+                errorMessage = 'Facebook API rate limit reached. Please wait a few minutes and try again. This is a temporary limitation from Facebook.';
+                isRetryable = true;
+            } else if (RetryUtil.isFacebookTransientError(error)) {
+                errorMessage = 'Facebook service is temporarily unavailable. Please try again in a few minutes.';
+                isRetryable = true;
+            } else if (error.message.includes('App ID')) {
                 errorMessage = 'Facebook App ID is not configured properly. Please check your server environment variables.';
             } else if (error.message.includes('App Secret')) {
                 errorMessage = 'Facebook App Secret is not configured properly. Please check your server environment variables.';
@@ -153,7 +162,7 @@ export class FacebookController {
             }
 
             // Redirect to frontend callback page with error
-            const frontendCallbackUrl = `${process.env.CLIENT_URL}/dashboard/facebook-callback?error=true&message=${encodeURIComponent(errorMessage)}`;
+            const frontendCallbackUrl = `${process.env.CLIENT_URL}/dashboard/facebook-callback?error=true&message=${encodeURIComponent(errorMessage)}&retryable=${isRetryable}`;
             res.redirect(frontendCallbackUrl);
         }
     };
