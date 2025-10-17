@@ -167,6 +167,62 @@ export class FacebookController {
         }
     };
 
+    // Validate and filter pages based on current access token
+    private async validateAndFilterPages(userId: string, accessToken: string): Promise<any[]> {
+        try {
+            const tokenValidation = await this.facebookService.verifyAccessToken(accessToken);
+            if (!tokenValidation.valid) {
+                return [];
+            }
+
+            // Get pages that user currently has access to
+            const currentPages = await this.facebookService.getUserPages(accessToken);
+            const currentPageIds = currentPages.map(page => page.id);
+
+            // Only return pages that exist in database AND user still has access to
+            const connectedPages = await FacebookPage.find({
+                userId,
+                isActive: true,
+                pageId: { $in: currentPageIds }
+            });
+
+            // Update pages with current data from Facebook
+            const accessiblePages = connectedPages.map(dbPage => {
+                const currentPage = currentPages.find(p => p.id === dbPage.pageId);
+                return {
+                    pageId: dbPage.pageId,
+                    pageName: currentPage?.name || dbPage.pageName,
+                    category: currentPage?.category || dbPage.category,
+                    picture: currentPage?.picture?.data?.url || dbPage.picture,
+                    followersCount: currentPage?.followers_count || dbPage.followersCount,
+                    connectedAt: dbPage.connectedAt
+                };
+            });
+
+            // Update database with current page data
+            for (const currentPage of currentPages) {
+                await FacebookPage.findOneAndUpdate(
+                    { userId, pageId: currentPage.id },
+                    {
+                        pageName: currentPage.name,
+                        category: currentPage.category,
+                        accessToken: currentPage.access_token,
+                        picture: currentPage.picture?.data?.url,
+                        followersCount: currentPage.followers_count,
+                        tasks: currentPage.tasks,
+                        lastUsedAt: new Date()
+                    },
+                    { upsert: false } // Don't create new pages, only update existing ones
+                );
+            }
+
+            return accessiblePages;
+        } catch (error) {
+            Logger.warn('Failed to validate Facebook pages access', { userId, error: error.message });
+            return [];
+        }
+    }
+
     // Handle Facebook user connection
     private async handleUserConnection(userId: string, accessToken: string, expiresIn: number, isReconnect: boolean = false): Promise<void> {
         // Get Facebook user information
@@ -305,26 +361,30 @@ export class FacebookController {
             }
 
             const facebookUser = await FacebookUser.findOne({ userId, isActive: true });
-            const connectedPages = await FacebookPage.find({ userId, isActive: true });
+
+            if (!facebookUser) {
+                return ResponseHelper.success(res, 'Facebook connection status retrieved successfully', {
+                    isConnected: false,
+                    facebookUser: null,
+                    pages: [],
+                    totalPages: 0
+                });
+            }
+
+            // Validate access token and get current accessible pages
+            const accessiblePages = await this.validateAndFilterPages(userId, facebookUser.accessToken);
 
             ResponseHelper.success(res, 'Facebook connection status retrieved successfully', {
                 isConnected: !!facebookUser,
-                facebookUser: facebookUser ? {
+                facebookUser: {
                     facebookId: facebookUser.facebookId,
                     facebookName: facebookUser.facebookName,
                     facebookEmail: facebookUser.facebookEmail,
                     profilePicture: facebookUser.profilePicture,
                     connectedAt: facebookUser.connectedAt
-                } : null,
-                pages: connectedPages.map(page => ({
-                    pageId: page.pageId,
-                    pageName: page.pageName,
-                    category: page.category,
-                    picture: page.picture,
-                    followersCount: page.followersCount,
-                    connectedAt: page.connectedAt
-                })),
-                totalPages: connectedPages.length
+                },
+                pages: accessiblePages,
+                totalPages: accessiblePages.length
             });
         } catch (error: any) {
             Logger.error('Get Facebook connection status error:', error);
@@ -341,18 +401,21 @@ export class FacebookController {
                 return ResponseHelper.unauthorized(res, 'User not authenticated');
             }
 
-            const connectedPages = await FacebookPage.find({ userId, isActive: true });
+            const facebookUser = await FacebookUser.findOne({ userId, isActive: true });
+
+            if (!facebookUser) {
+                return ResponseHelper.success(res, 'Connected Facebook pages retrieved successfully', {
+                    pages: [],
+                    totalPages: 0
+                });
+            }
+
+            // Validate access token and get current accessible pages
+            const accessiblePages = await this.validateAndFilterPages(userId, facebookUser.accessToken);
 
             ResponseHelper.success(res, 'Connected Facebook pages retrieved successfully', {
-                pages: connectedPages.map(page => ({
-                    pageId: page.pageId,
-                    pageName: page.pageName,
-                    category: page.category,
-                    picture: page.picture,
-                    followersCount: page.followersCount,
-                    connectedAt: page.connectedAt
-                })),
-                totalPages: connectedPages.length
+                pages: accessiblePages,
+                totalPages: accessiblePages.length
             });
         } catch (error: any) {
             Logger.error('Get connected Facebook pages error:', error);
