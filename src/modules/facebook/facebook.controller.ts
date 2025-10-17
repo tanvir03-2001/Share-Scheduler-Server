@@ -195,6 +195,7 @@ export class FacebookController {
                     category: currentPage?.category || dbPage.category,
                     picture: currentPage?.picture?.data?.url || dbPage.picture,
                     followersCount: currentPage?.followers_count || dbPage.followersCount,
+                    isDefaultActive: dbPage.isDefaultActive,
                     connectedAt: dbPage.connectedAt
                 };
             });
@@ -323,7 +324,10 @@ export class FacebookController {
 
         // Store pages in database
         const savedPages = [];
-        for (const page of pages) {
+        for (let i = 0; i < pages.length; i++) {
+            const page = pages[i];
+            const isFirstPage = i === 0;
+
             const facebookPage = await FacebookPage.findOneAndUpdate(
                 { userId, pageId: page.id },
                 {
@@ -335,6 +339,7 @@ export class FacebookController {
                     followersCount: page.followers_count,
                     tasks: page.tasks,
                     isActive: true,
+                    isDefaultActive: isFirstPage, // Set first page as default active
                     lastUsedAt: new Date()
                 },
                 { upsert: true, new: true }
@@ -833,6 +838,63 @@ export class FacebookController {
         } catch (error: any) {
             Logger.error('Get Instagram account insights error:', error);
             ResponseHelper.error(res, error.message || 'Failed to get Instagram account insights', error);
+        }
+    };
+
+    // Set active Facebook page
+    setActivePage = async (req: JWTAuthenticatedRequest, res: Response): Promise<void> => {
+        try {
+            const userId = req.jwtUser?.id;
+            const { pageId } = req.params;
+
+            if (!userId) {
+                return ResponseHelper.unauthorized(res, 'User not authenticated');
+            }
+
+            if (!pageId) {
+                return ResponseHelper.badRequest(res, 'Page ID is required');
+            }
+
+            // Check if the page exists and belongs to the user
+            const page = await FacebookPage.findOne({
+                userId,
+                pageId,
+                isActive: true
+            });
+
+            if (!page) {
+                return ResponseHelper.error(res, 'Facebook page not found or not accessible', null, 404);
+            }
+
+            // Set all pages for this user to inactive first
+            await FacebookPage.updateMany(
+                { userId, isActive: true },
+                { isDefaultActive: false }
+            );
+
+            // Set the selected page as active
+            await FacebookPage.updateOne(
+                { userId, pageId, isActive: true },
+                {
+                    isDefaultActive: true,
+                    lastUsedAt: new Date()
+                }
+            );
+
+            Logger.info('Active Facebook page updated successfully', {
+                userId,
+                pageId,
+                pageName: page.pageName
+            });
+
+            ResponseHelper.success(res, 'Active page updated successfully', {
+                pageId: page.pageId,
+                pageName: page.pageName,
+                message: `Page "${page.pageName}" is now active`
+            });
+        } catch (error: any) {
+            Logger.error('Set active Facebook page error:', error);
+            ResponseHelper.error(res, error.message || 'Failed to set active page', error);
         }
     };
 }

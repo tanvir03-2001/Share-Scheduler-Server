@@ -11,6 +11,7 @@ export interface IFacebookPage extends Document {
     followersCount?: number;
     tasks?: string[];
     isActive: boolean;
+    isDefaultActive: boolean; // Track which page is currently active/selected
     connectedAt: Date;
     lastUsedAt?: Date;
     createdAt: Date;
@@ -59,6 +60,10 @@ const FacebookPageSchema = new Schema<IFacebookPage>({
         type: Boolean,
         default: true
     },
+    isDefaultActive: {
+        type: Boolean,
+        default: false
+    },
     connectedAt: {
         type: Date,
         default: Date.now
@@ -82,6 +87,7 @@ FacebookPageSchema.index({ userId: 1 });
 FacebookPageSchema.index({ facebookUserId: 1 });
 FacebookPageSchema.index({ pageId: 1 });
 FacebookPageSchema.index({ isActive: 1 });
+FacebookPageSchema.index({ isDefaultActive: 1 });
 
 // Compound index to ensure unique page per user
 FacebookPageSchema.index({ userId: 1, pageId: 1 }, { unique: true });

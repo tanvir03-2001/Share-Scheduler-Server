@@ -232,7 +232,7 @@ export class FacebookService {
         return RetryUtil.executeWithRetry(async () => {
             const params = new URLSearchParams({
                 access_token: userAccessToken,
-                fields: 'id,name,category,access_token,picture,followers_count,tasks'
+                fields: 'id,name,category,access_token,picture.width(200).height(200),followers_count,tasks'
             });
 
             const response = await fetch(`https://graph.facebook.com/v18.0/me/accounts?${params.toString()}`, {
