@@ -118,7 +118,7 @@ export const validateCreateContent = (req: Request, res: Response, next: NextFun
         if (scheduledDate < today) {
             return res.status(400).json({
                 success: false,
-                message: 'Cannot schedule posts for past dates'
+                message: 'Cannot schedule posts for past dates. Please select today or a future date.'
             });
         }
     }
