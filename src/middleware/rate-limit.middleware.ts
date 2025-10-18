@@ -84,7 +84,7 @@ const generalApiLimiter = new RateLimiter({
     message: 'Too many requests. Please try again later.'
 });
 
-export const facebookRateLimit = (req: Request, res: Response, next: NextFunction): void => {
+export const facebookRateLimit = (req: Request, res: Response, next: NextFunction) => {
     const result = facebookApiLimiter.isAllowed(req);
 
     // Set rate limit headers
@@ -113,7 +113,7 @@ export const facebookRateLimit = (req: Request, res: Response, next: NextFunctio
     next();
 };
 
-export const generalRateLimit = (req: Request, res: Response, next: NextFunction): void => {
+export const generalRateLimit = (req: Request, res: Response, next: NextFunction) => {
     const result = generalApiLimiter.isAllowed(req);
 
     // Set rate limit headers
@@ -143,7 +143,7 @@ export const generalRateLimit = (req: Request, res: Response, next: NextFunction
 };
 
 // Special rate limiter for Facebook connection attempts
-export const facebookConnectionRateLimit = (req: Request, res: Response, next: NextFunction): void => {
+export const facebookConnectionRateLimit = (req: Request, res: Response, next: NextFunction) => {
     const connectionLimiter = new RateLimiter({
         windowMs: 60 * 60 * 1000, // 1 hour
         maxRequests: 5, // 5 connection attempts per hour

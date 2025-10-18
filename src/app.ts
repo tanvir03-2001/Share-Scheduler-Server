@@ -9,8 +9,13 @@ import passport from './config/passport';
 // Import database
 import { database } from './config/database';
 
+// Import services
+import { serveStaticFiles } from './services/file-upload.service';
+import { SchedulerService } from './services/scheduler.service';
+
 // Import routes
 import authRoutes from './modules/auth/auth.routes';
+import contentRoutes from './modules/content/content.routes';
 import facebookRoutes from './modules/facebook/facebook.routes';
 import userRoutes from './modules/user/user.routes';
 import homeRoutes from './routes/home.routes';
@@ -69,10 +74,14 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 
+// Serve static files (uploads)
+serveStaticFiles(app);
+
 // Routes
 app.use('/', homeRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/content', contentRoutes);
 app.use('/api/facebook', facebookRoutes);
 
 // Error handling middleware
@@ -103,6 +112,10 @@ const startServer = async () => {
             console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
             console.log(`🌐 URL: http://localhost:${PORT}`);
             console.log(`🗄️  Database: Connected`);
+
+            // Start the scheduler service
+            SchedulerService.start();
+            console.log(`⏰ Scheduler: Started`);
         });
     } catch (error) {
         console.error('Failed to start server:', error);
