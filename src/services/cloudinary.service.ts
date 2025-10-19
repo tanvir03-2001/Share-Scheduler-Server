@@ -17,7 +17,6 @@ export interface CloudinaryUploadResult {
     width?: number;
     height?: number;
     duration?: number;
-    playback_url?: string; // HLS streaming URL for videos
 }
 
 export class CloudinaryService {
@@ -54,19 +53,6 @@ export class CloudinaryService {
                 resource_type: result.resource_type
             });
 
-            // Extract playback URL for videos (HLS streaming URL)
-            let playbackUrl: string | undefined;
-            if (result.resource_type === 'video' && result.playback_url) {
-                playbackUrl = result.playback_url;
-            } else if (result.resource_type === 'video') {
-                // Generate HLS URL if not provided in response
-                playbackUrl = cloudinary.url(result.public_id, {
-                    resource_type: 'video',
-                    format: 'm3u8',
-                    secure: true
-                });
-            }
-
             return {
                 public_id: result.public_id,
                 secure_url: result.secure_url,
@@ -75,8 +61,7 @@ export class CloudinaryService {
                 bytes: result.bytes,
                 width: result.width,
                 height: result.height,
-                duration: result.duration,
-                playback_url: playbackUrl
+                duration: result.duration
             };
         } catch (error) {
             Logger.error('Error uploading file to Cloudinary:', error);
@@ -116,19 +101,6 @@ export class CloudinaryService {
                             // Console log the full response
                             console.log('Cloudinary Upload Response (from buffer):', JSON.stringify(result, null, 2));
 
-                            // Extract playback URL for videos (HLS streaming URL)
-                            let playbackUrl: string | undefined;
-                            if (result.resource_type === 'video' && result.playback_url) {
-                                playbackUrl = result.playback_url;
-                            } else if (result.resource_type === 'video') {
-                                // Generate HLS URL if not provided in response
-                                playbackUrl = cloudinary.url(result.public_id, {
-                                    resource_type: 'video',
-                                    format: 'm3u8',
-                                    secure: true
-                                });
-                            }
-
                             resolve({
                                 public_id: result.public_id,
                                 secure_url: result.secure_url,
@@ -137,8 +109,7 @@ export class CloudinaryService {
                                 bytes: result.bytes,
                                 width: result.width,
                                 height: result.height,
-                                duration: result.duration,
-                                playback_url: playbackUrl
+                                duration: result.duration
                             });
                         } else {
                             reject(new Error('Upload failed'));
@@ -195,6 +166,27 @@ export class CloudinaryService {
         } catch (error) {
             Logger.error('Error getting file info from Cloudinary:', error);
             throw new Error('Failed to get file info from Cloudinary');
+        }
+    }
+
+    /**
+     * Generate thumbnail URL from Cloudinary video URL
+     */
+    static getCloudinaryThumbnail(videoUrl: string, second: number = 0): string {
+        try {
+            // Replace .mp4 with .jpg
+            let base = videoUrl.replace('.mp4', '.jpg');
+
+            // If specific time frame is requested
+            if (second > 0) {
+                base = base.replace('/upload/', `/upload/so_${second}/`);
+            }
+
+            Logger.info('Generated thumbnail URL', { videoUrl, second, thumbnailUrl: base });
+            return base;
+        } catch (error) {
+            Logger.error('Error generating thumbnail URL:', error);
+            throw new Error('Failed to generate thumbnail URL');
         }
     }
 

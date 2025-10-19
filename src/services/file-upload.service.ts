@@ -94,7 +94,7 @@ export class FileUploadService {
         url: string;
         type: 'image' | 'video';
         cloudinaryPublicId?: string;
-        playbackUrl?: string;
+        thumbnailUrl?: string;
     }>> {
         const processedFiles = [];
 
@@ -124,22 +124,31 @@ export class FileUploadService {
                 // Clean up local file after successful upload
                 await this.deleteLocalFile(file.path);
 
+                // Generate thumbnail URL for videos
+                let thumbnailUrl: string | undefined;
+                if (file.mimetype.startsWith('video/')) {
+                    thumbnailUrl = CloudinaryService.getCloudinaryThumbnail(cloudinaryResult.secure_url, 5);
+                    Logger.info('Generated thumbnail URL for video', {
+                        videoUrl: cloudinaryResult.secure_url,
+                        thumbnailUrl
+                    });
+                }
+
                 processedFiles.push({
                     filename: file.filename,
                     originalName: file.originalname,
                     mimetype: file.mimetype,
                     size: file.size,
                     url: cloudinaryResult.secure_url,
-                    type: file.mimetype.startsWith('video/') ? 'video' : 'image',
+                    type: (file.mimetype.startsWith('video/') ? 'video' : 'image') as 'image' | 'video',
                     cloudinaryPublicId: cloudinaryResult.public_id,
-                    playbackUrl: cloudinaryResult.playback_url
+                    thumbnailUrl
                 });
 
                 Logger.info('File processed and uploaded to Cloudinary', {
                     originalName: file.originalname,
                     cloudinaryUrl: cloudinaryResult.secure_url,
-                    publicId: cloudinaryResult.public_id,
-                    playbackUrl: cloudinaryResult.playback_url
+                    publicId: cloudinaryResult.public_id
                 });
             } catch (error) {
                 Logger.error('Error processing file:', error);
@@ -150,8 +159,8 @@ export class FileUploadService {
                     mimetype: file.mimetype,
                     size: file.size,
                     url: `/uploads/content/${file.filename}`,
-                    type: file.mimetype.startsWith('video/') ? 'video' : 'image',
-                    playbackUrl: undefined
+                    type: (file.mimetype.startsWith('video/') ? 'video' : 'image') as 'image' | 'video',
+                    thumbnailUrl: undefined
                 });
             }
         }
