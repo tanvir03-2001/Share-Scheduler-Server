@@ -42,6 +42,7 @@ export class ContentService {
             });
 
             const savedContent = await newContent.save();
+            console.log(`📄 Content created - ID: ${savedContent._id} | User: ${userId} | Mode: ${publishMode}`);
             Logger.info('Content created successfully', {
                 contentId: savedContent._id,
                 userId,

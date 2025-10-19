@@ -37,6 +37,8 @@ export class FacebookPostingService {
             // Combine content and hashtags
             const fullContent = hashtags ? `${content}\n\n${hashtags}` : content;
 
+            console.log(`📝 Posting to Facebook page ${pageId} - ${mediaFile ? `with ${mediaFile.type}` : 'text only'}`);
+
             // If no media file, create a simple text post
             if (!mediaFile) {
                 return await this.createTextPost(pageId, fullContent, accessToken);
@@ -46,6 +48,7 @@ export class FacebookPostingService {
             return await this.createMediaPost(pageId, fullContent, mediaFile, accessToken);
 
         } catch (error) {
+            console.error(`❌ Error posting to Facebook: ${error instanceof Error ? error.message : 'Unknown error'}`);
             Logger.error('Error posting to Facebook:', error);
             return {
                 success: false,
@@ -79,6 +82,7 @@ export class FacebookPostingService {
             const result = await response.json() as any;
 
             if (result.error) {
+                console.error(`❌ Facebook API error: ${result.error.message || 'Unknown error'}`);
                 Logger.error('Facebook API error:', result.error);
                 return {
                     success: false,
@@ -86,6 +90,7 @@ export class FacebookPostingService {
                 };
             }
 
+            console.log(`✅ Facebook text post created - ID: ${result.id}`);
             Logger.info('Text post created successfully', { postId: result.id, pageId });
             return {
                 success: true,
@@ -93,6 +98,7 @@ export class FacebookPostingService {
             };
 
         } catch (error) {
+            console.error(`❌ Error creating text post: ${error instanceof Error ? error.message : 'Unknown error'}`);
             Logger.error('Error creating text post:', error);
             return {
                 success: false,
@@ -140,6 +146,7 @@ export class FacebookPostingService {
             const result = await response.json() as any;
 
             if (result.error) {
+                console.error(`❌ Facebook API error: ${result.error.message || 'Unknown error'}`);
                 Logger.error('Facebook API error:', result.error);
                 return {
                     success: false,
@@ -147,6 +154,7 @@ export class FacebookPostingService {
                 };
             }
 
+            console.log(`✅ Facebook ${mediaFile.type} post created - ID: ${result.id}`);
             Logger.info('Media post created successfully', { postId: result.id, pageId, type: mediaFile.type });
             return {
                 success: true,
@@ -154,6 +162,7 @@ export class FacebookPostingService {
             };
 
         } catch (error) {
+            console.error(`❌ Error creating media post: ${error instanceof Error ? error.message : 'Unknown error'}`);
             Logger.error('Error creating media post:', error);
             return {
                 success: false,

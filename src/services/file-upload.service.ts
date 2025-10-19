@@ -98,17 +98,11 @@ export class FileUploadService {
     }>> {
         const processedFiles = [];
 
-        Logger.info('Starting file processing', { filesCount: files.length });
+        Logger.info(`Processing ${files.length} files`);
 
         for (const file of files) {
             try {
-                Logger.info('Processing file', {
-                    filename: file.filename,
-                    originalName: file.originalname,
-                    mimetype: file.mimetype,
-                    size: file.size,
-                    path: file.path
-                });
+                Logger.info(`Processing: ${file.originalname}`);
 
                 // Upload to Cloudinary
                 const cloudinaryResult = await CloudinaryService.uploadFile(file.path, {
@@ -116,22 +110,13 @@ export class FileUploadService {
                     resource_type: file.mimetype.startsWith('video/') ? 'video' : 'image'
                 });
 
-                Logger.info('Cloudinary upload successful', {
-                    publicId: cloudinaryResult.public_id,
-                    secureUrl: cloudinaryResult.secure_url
-                });
+                Logger.info('File uploaded to cloud');
 
                 // Clean up local file after successful upload
                 await this.deleteLocalFile(file.path);
 
                 // Use the thumbnailUrl from Cloudinary result (already generated)
                 const thumbnailUrl = cloudinaryResult.thumbnailUrl;
-                if (thumbnailUrl) {
-                    Logger.info('Using thumbnail URL from Cloudinary', {
-                        videoUrl: cloudinaryResult.secure_url,
-                        thumbnailUrl
-                    });
-                }
 
                 processedFiles.push({
                     filename: file.filename,
@@ -144,13 +129,9 @@ export class FileUploadService {
                     thumbnailUrl
                 });
 
-                Logger.info('File processed and uploaded to Cloudinary', {
-                    originalName: file.originalname,
-                    cloudinaryUrl: cloudinaryResult.secure_url,
-                    publicId: cloudinaryResult.public_id
-                });
+                Logger.info(`Uploaded: ${file.originalname}`);
             } catch (error) {
-                Logger.error('Error processing file:', error);
+                Logger.error('Upload failed, using local storage');
                 // Fallback to local storage if Cloudinary fails
                 processedFiles.push({
                     filename: file.filename,
@@ -164,7 +145,7 @@ export class FileUploadService {
             }
         }
 
-        Logger.info('File processing completed', { processedCount: processedFiles.length });
+        Logger.info(`Completed: ${processedFiles.length} files processed`);
         return processedFiles;
     }
 
@@ -175,12 +156,12 @@ export class FileUploadService {
         try {
             if (fs.existsSync(filePath)) {
                 fs.unlinkSync(filePath);
-                Logger.info('Local file deleted successfully', { filePath });
+                Logger.info('Local file cleaned up');
                 return true;
             }
             return false;
         } catch (error) {
-            Logger.error('Error deleting local file:', error);
+            Logger.error('Failed to delete local file');
             return false;
         }
     }
@@ -196,10 +177,7 @@ export class FileUploadService {
                 const cloudinaryResult = await CloudinaryService.deleteFile(cloudinaryPublicId, resourceType);
 
                 if (cloudinaryResult) {
-                    Logger.info('File deleted from Cloudinary successfully', {
-                        filename,
-                        cloudinaryPublicId
-                    });
+                    Logger.info('File deleted from cloud');
                     return true;
                 }
             }
@@ -209,13 +187,13 @@ export class FileUploadService {
 
             if (fs.existsSync(filePath)) {
                 fs.unlinkSync(filePath);
-                Logger.info('Local file deleted successfully', { filename });
+                Logger.info('Local file deleted');
                 return true;
             }
 
             return false;
         } catch (error) {
-            Logger.error('Error deleting file:', error);
+            Logger.error('Failed to delete file');
             return false;
         }
     }
@@ -268,10 +246,10 @@ export class FileUploadService {
                 }
             }
 
-            Logger.info('File cleanup completed', { deletedCount, daysOld });
+            Logger.info(`Cleanup: ${deletedCount} old files removed`);
             return deletedCount;
         } catch (error) {
-            Logger.error('Error during file cleanup:', error);
+            Logger.error('Cleanup failed');
             return 0;
         }
     }

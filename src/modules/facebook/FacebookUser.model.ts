@@ -70,8 +70,7 @@ const FacebookUserSchema = new Schema<IFacebookUser>({
 });
 
 // Indexes for better performance
-FacebookUserSchema.index({ userId: 1 });
-FacebookUserSchema.index({ facebookId: 1 });
+// userId and facebookId indexes are already created by unique: true
 FacebookUserSchema.index({ isActive: 1 });
 
 // Pre-save middleware to update timestamps

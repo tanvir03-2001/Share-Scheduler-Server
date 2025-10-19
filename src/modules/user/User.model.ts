@@ -55,15 +55,13 @@ const UserSchema = new Schema<IUser>({
         default: false
     },
     emailVerificationToken: {
-        type: String,
-        sparse: true // Allows multiple null values
+        type: String
     },
     emailVerificationExpires: {
         type: Date
     },
     passwordResetToken: {
-        type: String,
-        sparse: true
+        type: String
     },
     passwordResetExpires: {
         type: Date
@@ -105,7 +103,7 @@ const UserSchema = new Schema<IUser>({
     }
 });
 
-// Indexes for better performance (removed duplicate indexes)
+// Indexes for better performance
 // email index is already created by unique: true
 UserSchema.index({ emailVerificationToken: 1 }, { sparse: true });
 UserSchema.index({ passwordResetToken: 1 }, { sparse: true });

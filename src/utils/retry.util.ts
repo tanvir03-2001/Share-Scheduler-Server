@@ -63,7 +63,7 @@ export class RetryUtil {
                     opts.maxDelay
                 );
 
-                console.log(`Retry attempt ${attempt + 1}/${opts.maxRetries} after ${Math.round(delay)}ms delay. Error: ${error instanceof Error ? error.message : String(error)}`);
+                console.log(`Retry ${attempt + 1}/${opts.maxRetries} after ${Math.round(delay)}ms - ${error instanceof Error ? error.message : String(error)}`);
 
                 await this.sleep(delay);
             }

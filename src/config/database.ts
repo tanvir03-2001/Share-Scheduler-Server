@@ -28,25 +28,30 @@ class Database {
             });
 
             this.isConnected = true;
+            console.log('🗄️ MongoDB connected successfully');
             Logger.info('Connected to MongoDB successfully', { uri: mongoUri });
 
             // Handle connection events
             mongoose.connection.on('error', (error) => {
+                console.error('❌ MongoDB connection error:', error.message);
                 Logger.error('MongoDB connection error:', error);
                 this.isConnected = false;
             });
 
             mongoose.connection.on('disconnected', () => {
+                console.warn('⚠️ MongoDB disconnected');
                 Logger.warn('MongoDB disconnected');
                 this.isConnected = false;
             });
 
             mongoose.connection.on('reconnected', () => {
+                console.log('🔄 MongoDB reconnected');
                 Logger.info('MongoDB reconnected');
                 this.isConnected = true;
             });
 
         } catch (error) {
+            console.error('❌ Failed to connect to MongoDB:', error instanceof Error ? error.message : error);
             Logger.error('Failed to connect to MongoDB:', error);
             throw error;
         }

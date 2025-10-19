@@ -26,6 +26,7 @@ export class SchedulerService {
 
         this.cronJob.start();
         this.isRunning = true;
+        console.log('⏰ Scheduler started - checking posts every minute');
         Logger.info('Scheduler started successfully');
     }
 
@@ -52,6 +53,7 @@ export class SchedulerService {
                 return;
             }
 
+            console.log(`📅 Processing ${contentsToPublish.length} scheduled posts`);
             Logger.info(`Processing ${contentsToPublish.length} scheduled posts`);
 
             for (const content of contentsToPublish) {

@@ -83,13 +83,12 @@ const FacebookPageSchema = new Schema<IFacebookPage>({
 });
 
 // Indexes for better performance
-FacebookPageSchema.index({ userId: 1 });
 FacebookPageSchema.index({ facebookUserId: 1 });
 FacebookPageSchema.index({ pageId: 1 });
 FacebookPageSchema.index({ isActive: 1 });
 FacebookPageSchema.index({ isDefaultActive: 1 });
 
-// Compound index to ensure unique page per user
+// Compound index to ensure unique page per user (includes userId)
 FacebookPageSchema.index({ userId: 1, pageId: 1 }, { unique: true });
 
 // Pre-save middleware to update timestamps

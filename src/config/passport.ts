@@ -3,6 +3,7 @@ import { Strategy as FacebookStrategy } from 'passport-facebook';
 import { AuthService } from '../modules/auth/auth.service';
 import { FacebookUser } from '../modules/facebook/FacebookUser.model';
 import { User } from '../modules/user/User.model';
+import { Logger } from '../utils/logger';
 
 const authService = new AuthService();
 
@@ -18,7 +19,7 @@ passport.use(new FacebookStrategy({
     ]
 }, async (accessToken, refreshToken, profile, done) => {
     try {
-        console.log('Facebook profile:', profile);
+        Logger.info('Facebook authentication attempt', { facebookId: profile.id });
 
         // Check if Facebook user already exists
         let facebookUser = await FacebookUser.findOne({ facebookId: profile.id });

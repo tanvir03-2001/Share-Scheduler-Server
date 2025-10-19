@@ -45,29 +45,10 @@ export class CloudinaryService {
 
             const result = await cloudinary.uploader.upload(filePath, uploadOptions);
 
-            // Console log the full response
-            console.log('Cloudinary Upload Response:', JSON.stringify(result, null, 2));
-
-            Logger.info('File uploaded to Cloudinary successfully', {
-                public_id: result.public_id,
-                url: result.secure_url,
-                resource_type: result.resource_type
-            });
+            Logger.info('File uploaded to cloud');
 
             // Generate thumbnail URL
             const thumbnailUrl = this.generateThumbnailUrl(result.secure_url);
-            // Console log the full response
-            console.log('data', JSON.stringify({
-                public_id: result.public_id,
-                secure_url: result.secure_url,
-                format: result.format,
-                resource_type: result.resource_type,
-                bytes: result.bytes,
-                width: result.width,
-                height: result.height,
-                duration: result.duration,
-                thumbnailUrl
-            }));
             return {
                 public_id: result.public_id,
                 secure_url: result.secure_url,
@@ -80,7 +61,7 @@ export class CloudinaryService {
                 thumbnailUrl
             };
         } catch (error) {
-            Logger.error('Error uploading file to Cloudinary:', error);
+            Logger.error('Cloud upload failed');
             throw new Error('Failed to upload file to Cloudinary');
         }
     }
@@ -114,9 +95,6 @@ export class CloudinaryService {
                         if (error) {
                             reject(error);
                         } else if (result) {
-                            // Console log the full response
-                            console.log('Cloudinary Upload Response (from buffer):', JSON.stringify(result, null, 2));
-
                             // Generate thumbnail URL
                             const thumbnailUrl = this.generateThumbnailUrl(result.secure_url);
 
@@ -138,15 +116,11 @@ export class CloudinaryService {
                 ).end(buffer);
             });
 
-            Logger.info('File uploaded to Cloudinary from buffer successfully', {
-                public_id: result.public_id,
-                url: result.secure_url,
-                resource_type: result.resource_type
-            });
+            Logger.info('Buffer uploaded to cloud');
 
             return result;
         } catch (error) {
-            Logger.error('Error uploading file from buffer to Cloudinary:', error);
+            Logger.error('Buffer upload failed');
             throw new Error('Failed to upload file to Cloudinary');
         }
     }
@@ -161,14 +135,14 @@ export class CloudinaryService {
             });
 
             if (result.result === 'ok') {
-                Logger.info('File deleted from Cloudinary successfully', { public_id: publicId });
+                Logger.info('File deleted from cloud');
                 return true;
             } else {
-                Logger.warn('File deletion from Cloudinary failed', { public_id: publicId, result: result.result });
+                Logger.warn('Cloud deletion failed');
                 return false;
             }
         } catch (error) {
-            Logger.error('Error deleting file from Cloudinary:', error);
+            Logger.error('Cloud deletion error');
             return false;
         }
     }
@@ -184,7 +158,7 @@ export class CloudinaryService {
 
             return result;
         } catch (error) {
-            Logger.error('Error getting file info from Cloudinary:', error);
+            Logger.error('Failed to get file info');
             throw new Error('Failed to get file info from Cloudinary');
         }
     }
@@ -233,7 +207,7 @@ export class CloudinaryService {
                     transformation,
                 });
 
-                Logger.info('Generated video thumbnail URL', { input, publicId, thumbnailUrl });
+                Logger.info('Video thumbnail generated');
                 return thumbnailUrl;
             }
 
@@ -246,10 +220,10 @@ export class CloudinaryService {
                 format: 'jpg',
             });
 
-            Logger.info('Generated image thumbnail URL', { input, publicId, thumbnailUrl });
+            Logger.info('Image thumbnail generated');
             return thumbnailUrl;
         } catch (error) {
-            Logger.error('Error generating thumbnail URL:', error);
+            Logger.error('Thumbnail generation failed');
             throw new Error('Failed to generate thumbnail URL');
         }
     }
@@ -292,7 +266,7 @@ export class CloudinaryService {
 
             return url;
         } catch (error) {
-            Logger.error('Error generating optimized URL:', error);
+            Logger.error('URL optimization failed');
             throw new Error('Failed to generate optimized URL');
         }
     }

@@ -11,7 +11,6 @@ import { database } from './config/database';
 
 // Import services
 import { serveStaticFiles } from './services/file-upload.service';
-import { SchedulerService } from './services/scheduler.service';
 
 // Import routes
 import authRoutes from './modules/auth/auth.routes';
@@ -86,7 +85,7 @@ app.use('/api/facebook', facebookRoutes);
 
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
-    console.error(err.stack);
+    console.error(`❌ Server Error: ${err.message}`);
     res.status(500).json({
         message: 'Something went wrong!',
         error: process.env.NODE_ENV === 'development' ? err.message : {}
@@ -108,14 +107,8 @@ const startServer = async () => {
         await database.connect();
 
         app.listen(PORT, () => {
-            console.log(`🚀 Server is running on port ${PORT}`);
-            console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
-            console.log(`🌐 URL: http://localhost:${PORT}`);
-            console.log(`🗄️  Database: Connected`);
-
-            // Start the scheduler service
-            SchedulerService.start();
-            console.log(`⏰ Scheduler: Started`);
+            console.log(`🚀 Server running on port ${PORT} (${process.env.NODE_ENV || 'development'})`);
+            console.log(`🌐 http://localhost:${PORT} | 🗄️ DB: Connected | ⏰ Scheduler: Started`);
         });
     } catch (error) {
         console.error('Failed to start server:', error);

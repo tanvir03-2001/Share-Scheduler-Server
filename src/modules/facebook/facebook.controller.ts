@@ -35,6 +35,7 @@ export class FacebookController {
             const state = Buffer.from(JSON.stringify({ userId, type: 'user', reconnect: !!reconnect })).toString('base64');
             const authUrl = this.facebookService.generateUserAuthUrl(state);
 
+            console.log(`🔗 Facebook auth URL generated for user ${userId}`);
             Logger.info('Facebook user auth URL generated', { userId, reconnect: !!reconnect });
 
             ResponseHelper.success(res, 'Facebook user auth URL generated successfully', { authUrl });
