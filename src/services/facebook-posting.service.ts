@@ -6,14 +6,14 @@ import { Logger } from '../utils/logger';
 export interface PostToFacebookRequest {
     content: string;
     hashtags?: string;
-    mediaFiles?: Array<{
+    mediaFile?: {
         filename: string;
         originalName: string;
         mimetype: string;
         size: number;
         url: string;
         type: 'image' | 'video';
-    }>;
+    };
     pageId: string;
     accessToken: string;
 }
@@ -32,23 +32,18 @@ export class FacebookPostingService {
      */
     static async postToFacebook(request: PostToFacebookRequest): Promise<FacebookPostResponse> {
         try {
-            const { content, hashtags, mediaFiles, pageId, accessToken } = request;
+            const { content, hashtags, mediaFile, pageId, accessToken } = request;
 
             // Combine content and hashtags
             const fullContent = hashtags ? `${content}\n\n${hashtags}` : content;
 
-            // If no media files, create a simple text post
-            if (!mediaFiles || mediaFiles.length === 0) {
+            // If no media file, create a simple text post
+            if (!mediaFile) {
                 return await this.createTextPost(pageId, fullContent, accessToken);
             }
 
-            // If single media file, create media post
-            if (mediaFiles.length === 1) {
-                return await this.createMediaPost(pageId, fullContent, mediaFiles[0], accessToken);
-            }
-
-            // If multiple media files, create album post
-            return await this.createAlbumPost(pageId, fullContent, mediaFiles, accessToken);
+            // Create media post with single media file
+            return await this.createMediaPost(pageId, fullContent, mediaFile, accessToken);
 
         } catch (error) {
             Logger.error('Error posting to Facebook:', error);

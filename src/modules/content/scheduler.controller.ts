@@ -87,20 +87,18 @@ export class SchedulerController {
 
             // Filter and format upcoming posts
             const upcomingPosts = contents
-                .filter(content => content.scheduledPosts.some(post => post.status === 'pending'))
+                .filter(content => content.scheduledPost && content.scheduledPost.status === 'pending')
                 .map(content => ({
                     id: content._id.toString(),
                     postType: content.postType,
                     content: content.content,
                     platforms: content.platforms,
-                    scheduledPosts: content.scheduledPosts
-                        .filter(post => post.status === 'pending')
-                        .map(post => ({
-                            postNumber: post.postNumber,
-                            scheduledDate: post.scheduledDate.toISOString().split('T')[0],
-                            scheduledTime: post.scheduledTime,
-                            status: post.status
-                        }))
+                    scheduledPost: content.scheduledPost ? {
+                        postNumber: content.scheduledPost.postNumber,
+                        scheduledDate: content.scheduledPost.scheduledDate.toISOString().split('T')[0],
+                        scheduledTime: content.scheduledPost.scheduledTime,
+                        status: content.scheduledPost.status
+                    } : undefined
                 }));
 
             sendResponse(res, 200, true, 'Upcoming posts retrieved successfully', {
@@ -138,22 +136,22 @@ export class SchedulerController {
 
             // Format published posts with their scheduled history
             const history = contents
-                .filter(content => content.scheduledPosts.length > 0)
+                .filter(content => content.scheduledPost)
                 .map(content => ({
                     id: content._id.toString(),
                     postType: content.postType,
                     content: content.content,
                     platforms: content.platforms,
                     publishedAt: content.publishedAt?.toISOString(),
-                    scheduledPosts: content.scheduledPosts.map(post => ({
-                        postNumber: post.postNumber,
-                        scheduledDate: post.scheduledDate.toISOString().split('T')[0],
-                        scheduledTime: post.scheduledTime,
-                        status: post.status,
-                        publishedAt: post.publishedAt?.toISOString(),
-                        facebookPostId: post.facebookPostId,
-                        error: post.error
-                    }))
+                    scheduledPost: content.scheduledPost ? {
+                        postNumber: content.scheduledPost.postNumber,
+                        scheduledDate: content.scheduledPost.scheduledDate.toISOString().split('T')[0],
+                        scheduledTime: content.scheduledPost.scheduledTime,
+                        status: content.scheduledPost.status,
+                        publishedAt: content.scheduledPost.publishedAt?.toISOString(),
+                        facebookPostId: content.scheduledPost.facebookPostId,
+                        error: content.scheduledPost.error
+                    } : undefined
                 }));
 
             sendResponse(res, 200, true, 'Scheduled history retrieved successfully', {

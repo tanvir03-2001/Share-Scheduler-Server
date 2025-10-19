@@ -83,14 +83,11 @@ export class SchedulerService {
             const currentTime = now.toTimeString().slice(0, 5);
             const currentDate = now.toISOString().split('T')[0];
 
-            const pendingPosts = content.scheduledPosts.filter((post: any) =>
-                post.status === 'pending' &&
-                post.scheduledDate.toISOString().split('T')[0] === currentDate &&
-                post.scheduledTime <= currentTime
-            );
-
-            for (const scheduledPost of pendingPosts) {
-                await this.publishToFacebook(content, scheduledPost, pages);
+            if (content.scheduledPost &&
+                content.scheduledPost.status === 'pending' &&
+                content.scheduledPost.scheduledDate.toISOString().split('T')[0] === currentDate &&
+                content.scheduledPost.scheduledTime <= currentTime) {
+                await this.publishToFacebook(content, content.scheduledPost, pages);
             }
 
         } catch (error) {
@@ -126,7 +123,7 @@ export class SchedulerService {
             const facebookContent = {
                 content: content.content,
                 hashtags: content.hashtags,
-                mediaFiles: content.mediaFiles,
+                mediaFile: content.mediaFile,
                 pageId: page.pageId,
                 accessToken: page.accessToken
             };
@@ -208,10 +205,9 @@ export class SchedulerService {
             const now = new Date();
             const currentTime = now.toTimeString().slice(0, 5);
 
-            const pendingPost = content.scheduledPosts.find(post => post.status === 'pending');
-            if (pendingPost) {
-                pendingPost.scheduledDate = now;
-                pendingPost.scheduledTime = currentTime;
+            if (content.scheduledPost && content.scheduledPost.status === 'pending') {
+                content.scheduledPost.scheduledDate = now;
+                content.scheduledPost.scheduledTime = currentTime;
 
                 await content.save();
                 Logger.info('Content scheduled for immediate processing', { contentId });

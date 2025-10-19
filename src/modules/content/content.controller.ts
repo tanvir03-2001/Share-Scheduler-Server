@@ -119,22 +119,22 @@ export class ContentController {
                     postType: content.postType,
                     content: content.content,
                     hashtags: content.hashtags,
-                    mediaFiles: content.mediaFiles,
+                    mediaFile: content.mediaFile,
                     platforms: content.platforms,
                     publishMode: content.publishMode,
                     status: content.status,
                     publishedAt: content.publishedAt?.toISOString(),
                     createdAt: content.createdAt.toISOString(),
                     updatedAt: content.updatedAt.toISOString(),
-                    scheduledPosts: content.scheduledPosts.map(post => ({
-                        postNumber: post.postNumber,
-                        scheduledDate: post.scheduledDate.toISOString().split('T')[0],
-                        scheduledTime: post.scheduledTime,
-                        status: post.status,
-                        publishedAt: post.publishedAt?.toISOString(),
-                        facebookPostId: post.facebookPostId,
-                        error: post.error
-                    }))
+                    scheduledPost: content.scheduledPost ? {
+                        postNumber: content.scheduledPost.postNumber,
+                        scheduledDate: content.scheduledPost.scheduledDate.toISOString().split('T')[0],
+                        scheduledTime: content.scheduledPost.scheduledTime,
+                        status: content.scheduledPost.status,
+                        publishedAt: content.scheduledPost.publishedAt?.toISOString(),
+                        facebookPostId: content.scheduledPost.facebookPostId,
+                        error: content.scheduledPost.error
+                    } : undefined
                 })),
                 total,
                 page,
@@ -172,22 +172,22 @@ export class ContentController {
                 postType: content.postType,
                 content: content.content,
                 hashtags: content.hashtags,
-                mediaFiles: content.mediaFiles,
+                mediaFile: content.mediaFile,
                 platforms: content.platforms,
                 publishMode: content.publishMode,
                 status: content.status,
                 publishedAt: content.publishedAt?.toISOString(),
                 createdAt: content.createdAt.toISOString(),
                 updatedAt: content.updatedAt.toISOString(),
-                scheduledPosts: content.scheduledPosts.map(post => ({
-                    postNumber: post.postNumber,
-                    scheduledDate: post.scheduledDate.toISOString().split('T')[0],
-                    scheduledTime: post.scheduledTime,
-                    status: post.status,
-                    publishedAt: post.publishedAt?.toISOString(),
-                    facebookPostId: post.facebookPostId,
-                    error: post.error
-                }))
+                scheduledPost: content.scheduledPost ? {
+                    postNumber: content.scheduledPost.postNumber,
+                    scheduledDate: content.scheduledPost.scheduledDate.toISOString().split('T')[0],
+                    scheduledTime: content.scheduledPost.scheduledTime,
+                    status: content.scheduledPost.status,
+                    publishedAt: content.scheduledPost.publishedAt?.toISOString(),
+                    facebookPostId: content.scheduledPost.facebookPostId,
+                    error: content.scheduledPost.error
+                } : undefined
             };
 
             sendResponse(res, 200, true, 'Content retrieved successfully', responseData);

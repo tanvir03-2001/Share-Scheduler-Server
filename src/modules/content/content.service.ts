@@ -146,8 +146,8 @@ export class ContentService {
             if (hashtags !== undefined) updateFields.hashtags = hashtags;
             if (platforms !== undefined) updateFields.platforms = platforms;
             if (publishMode !== undefined) updateFields.publishMode = publishMode;
-            if (mediaFiles !== undefined) updateFields.mediaFiles = mediaFiles;
-            if (scheduledPosts.length > 0) updateFields.scheduledPosts = scheduledPosts;
+            if (mediaFiles !== undefined) updateFields.mediaFile = mediaFiles[0] || undefined;
+            if (scheduledPosts.length > 0) updateFields.scheduledPost = scheduledPosts[0] || undefined;
 
             const updatedContent = await Content.findByIdAndUpdate(
                 contentId,
@@ -198,19 +198,18 @@ export class ContentService {
 
             const contents = await Content.find({
                 status: 'scheduled',
-                'scheduledPosts.status': 'pending',
-                'scheduledPosts.scheduledDate': {
+                'scheduledPost.status': 'pending',
+                'scheduledPost.scheduledDate': {
                     $lte: new Date(currentDate + 'T23:59:59.999Z')
                 }
             }).populate('userId', 'name email');
 
             // Filter contents that have pending posts for current time or past time
             const readyToPublish = contents.filter(content => {
-                return content.scheduledPosts.some(post =>
-                    post.status === 'pending' &&
-                    post.scheduledDate.toISOString().split('T')[0] === currentDate &&
-                    post.scheduledTime <= currentTime
-                );
+                return content.scheduledPost &&
+                    content.scheduledPost.status === 'pending' &&
+                    content.scheduledPost.scheduledDate.toISOString().split('T')[0] === currentDate &&
+                    content.scheduledPost.scheduledTime <= currentTime;
             });
 
             return readyToPublish;
@@ -232,22 +231,22 @@ export class ContentService {
     ): Promise<boolean> {
         try {
             const updateFields: any = {
-                'scheduledPosts.$.status': status,
-                'scheduledPosts.$.publishedAt': new Date()
+                'scheduledPost.status': status,
+                'scheduledPost.publishedAt': new Date()
             };
 
             if (facebookPostId) {
-                updateFields['scheduledPosts.$.facebookPostId'] = facebookPostId;
+                updateFields['scheduledPost.facebookPostId'] = facebookPostId;
             }
 
             if (error) {
-                updateFields['scheduledPosts.$.error'] = error;
+                updateFields['scheduledPost.error'] = error;
             }
 
             const result = await Content.updateOne(
                 {
                     _id: contentId,
-                    'scheduledPosts.postNumber': postNumber
+                    'scheduledPost.postNumber': postNumber
                 },
                 { $set: updateFields }
             );
@@ -256,9 +255,8 @@ export class ContentService {
             if (result.modifiedCount > 0) {
                 const content = await Content.findById(contentId);
                 if (content) {
-                    const allPostsCompleted = content.scheduledPosts.every(post =>
-                        post.status === 'published' || post.status === 'failed'
-                    );
+                    const allPostsCompleted = content.scheduledPost &&
+                        (content.scheduledPost.status === 'published' || content.scheduledPost.status === 'failed');
 
                     if (allPostsCompleted) {
                         await Content.findByIdAndUpdate(contentId, {
