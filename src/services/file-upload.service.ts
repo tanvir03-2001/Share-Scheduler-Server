@@ -94,6 +94,7 @@ export class FileUploadService {
         url: string;
         type: 'image' | 'video';
         cloudinaryPublicId?: string;
+        playbackUrl?: string;
     }>> {
         const processedFiles = [];
 
@@ -130,13 +131,15 @@ export class FileUploadService {
                     size: file.size,
                     url: cloudinaryResult.secure_url,
                     type: file.mimetype.startsWith('video/') ? 'video' : 'image',
-                    cloudinaryPublicId: cloudinaryResult.public_id
+                    cloudinaryPublicId: cloudinaryResult.public_id,
+                    playbackUrl: cloudinaryResult.playback_url
                 });
 
                 Logger.info('File processed and uploaded to Cloudinary', {
                     originalName: file.originalname,
                     cloudinaryUrl: cloudinaryResult.secure_url,
-                    publicId: cloudinaryResult.public_id
+                    publicId: cloudinaryResult.public_id,
+                    playbackUrl: cloudinaryResult.playback_url
                 });
             } catch (error) {
                 Logger.error('Error processing file:', error);
@@ -147,7 +150,8 @@ export class FileUploadService {
                     mimetype: file.mimetype,
                     size: file.size,
                     url: `/uploads/content/${file.filename}`,
-                    type: file.mimetype.startsWith('video/') ? 'video' : 'image'
+                    type: file.mimetype.startsWith('video/') ? 'video' : 'image',
+                    playbackUrl: undefined
                 });
             }
         }

@@ -17,6 +17,7 @@ export interface CloudinaryUploadResult {
     width?: number;
     height?: number;
     duration?: number;
+    playback_url?: string; // HLS streaming URL for videos
 }
 
 export class CloudinaryService {
@@ -44,11 +45,27 @@ export class CloudinaryService {
 
             const result = await cloudinary.uploader.upload(filePath, uploadOptions);
 
+            // Console log the full response
+            console.log('Cloudinary Upload Response:', JSON.stringify(result, null, 2));
+
             Logger.info('File uploaded to Cloudinary successfully', {
                 public_id: result.public_id,
                 url: result.secure_url,
                 resource_type: result.resource_type
             });
+
+            // Extract playback URL for videos (HLS streaming URL)
+            let playbackUrl: string | undefined;
+            if (result.resource_type === 'video' && result.playback_url) {
+                playbackUrl = result.playback_url;
+            } else if (result.resource_type === 'video') {
+                // Generate HLS URL if not provided in response
+                playbackUrl = cloudinary.url(result.public_id, {
+                    resource_type: 'video',
+                    format: 'm3u8',
+                    secure: true
+                });
+            }
 
             return {
                 public_id: result.public_id,
@@ -58,7 +75,8 @@ export class CloudinaryService {
                 bytes: result.bytes,
                 width: result.width,
                 height: result.height,
-                duration: result.duration
+                duration: result.duration,
+                playback_url: playbackUrl
             };
         } catch (error) {
             Logger.error('Error uploading file to Cloudinary:', error);
@@ -95,6 +113,22 @@ export class CloudinaryService {
                         if (error) {
                             reject(error);
                         } else if (result) {
+                            // Console log the full response
+                            console.log('Cloudinary Upload Response (from buffer):', JSON.stringify(result, null, 2));
+
+                            // Extract playback URL for videos (HLS streaming URL)
+                            let playbackUrl: string | undefined;
+                            if (result.resource_type === 'video' && result.playback_url) {
+                                playbackUrl = result.playback_url;
+                            } else if (result.resource_type === 'video') {
+                                // Generate HLS URL if not provided in response
+                                playbackUrl = cloudinary.url(result.public_id, {
+                                    resource_type: 'video',
+                                    format: 'm3u8',
+                                    secure: true
+                                });
+                            }
+
                             resolve({
                                 public_id: result.public_id,
                                 secure_url: result.secure_url,
@@ -103,7 +137,8 @@ export class CloudinaryService {
                                 bytes: result.bytes,
                                 width: result.width,
                                 height: result.height,
-                                duration: result.duration
+                                duration: result.duration,
+                                playback_url: playbackUrl
                             });
                         } else {
                             reject(new Error('Upload failed'));

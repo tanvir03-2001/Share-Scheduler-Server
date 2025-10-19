@@ -23,6 +23,7 @@ export interface IMediaFile {
     url: string;
     type: 'image' | 'video';
     cloudinaryPublicId?: string;
+    playbackUrl?: string; // HLS streaming URL for videos
 }
 
 export interface IScheduledPost {
@@ -62,6 +63,9 @@ const MediaFileSchema = new Schema<IMediaFile>({
         required: true
     },
     cloudinaryPublicId: {
+        type: String
+    },
+    playbackUrl: {
         type: String
     }
 }, { _id: false });

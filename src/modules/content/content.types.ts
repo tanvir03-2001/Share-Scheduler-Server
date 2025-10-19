@@ -36,6 +36,8 @@ export interface GetContentResponse {
                 size: number;
                 url: string;
                 type: string;
+                cloudinaryPublicId?: string;
+                playbackUrl?: string;
             };
             platforms: string[];
             publishMode: string;
@@ -74,6 +76,7 @@ export interface UpdateContentRequest {
         url: string;
         type: 'image' | 'video';
         cloudinaryPublicId?: string;
+        playbackUrl?: string;
     };
 }
 
