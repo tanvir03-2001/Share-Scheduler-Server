@@ -84,7 +84,7 @@ const generalApiLimiter = new RateLimiter({
     message: 'Too many requests. Please try again later.'
 });
 
-export const facebookRateLimit = (req: Request, res: Response, next: NextFunction) => {
+export const facebookRateLimit = (req: Request, res: Response, next: NextFunction): void => {
     const result = facebookApiLimiter.isAllowed(req);
 
     // Set rate limit headers
@@ -102,18 +102,19 @@ export const facebookRateLimit = (req: Request, res: Response, next: NextFunctio
             method: req.method
         });
 
-        return res.status(429).json({
+        res.status(429).json({
             success: false,
             error: 'Facebook API rate limit exceeded. Please wait before making more requests.',
             message: 'Rate limit exceeded. Please try again in a few minutes.',
             retryAfter: Math.ceil((result.resetTime - Date.now()) / 1000)
         });
+        return;
     }
 
     next();
 };
 
-export const generalRateLimit = (req: Request, res: Response, next: NextFunction) => {
+export const generalRateLimit = (req: Request, res: Response, next: NextFunction): void => {
     const result = generalApiLimiter.isAllowed(req);
 
     // Set rate limit headers
@@ -131,19 +132,20 @@ export const generalRateLimit = (req: Request, res: Response, next: NextFunction
             method: req.method
         });
 
-        return res.status(429).json({
+        res.status(429).json({
             success: false,
             error: 'Rate limit exceeded. Please wait before making more requests.',
             message: 'Too many requests. Please try again in a few minutes.',
             retryAfter: Math.ceil((result.resetTime - Date.now()) / 1000)
         });
+        return;
     }
 
     next();
 };
 
 // Special rate limiter for Facebook connection attempts
-export const facebookConnectionRateLimit = (req: Request, res: Response, next: NextFunction) => {
+export const facebookConnectionRateLimit = (req: Request, res: Response, next: NextFunction): void => {
     const connectionLimiter = new RateLimiter({
         windowMs: 60 * 60 * 1000, // 1 hour
         maxRequests: 5, // 5 connection attempts per hour
@@ -159,12 +161,13 @@ export const facebookConnectionRateLimit = (req: Request, res: Response, next: N
             endpoint: req.path
         });
 
-        return res.status(429).json({
+        res.status(429).json({
             success: false,
             error: 'Too many Facebook connection attempts. Please wait before trying again.',
             message: 'You have exceeded the maximum number of Facebook connection attempts. Please try again in an hour.',
             retryAfter: Math.ceil((result.resetTime - Date.now()) / 1000)
         });
+        return;
     }
 
     next();

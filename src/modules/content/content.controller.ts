@@ -77,7 +77,7 @@ export class ContentController {
             if (content.publishMode === 'schedule' && content.scheduledPost) {
                 responseData.scheduledPost = {
                     postNumber: content.scheduledPost.postNumber,
-                    scheduledDate: content.scheduledPost.scheduledDate.toISOString().split('T')[0],
+                    scheduledDate: content.scheduledPost.scheduledDate?.toISOString().split('T')[0],
                     scheduledTime: content.scheduledPost.scheduledTime
                 };
             }
@@ -85,7 +85,20 @@ export class ContentController {
             sendResponse(res, 201, true, 'Content created successfully', responseData);
         } catch (error) {
             Logger.error('Error in createContent controller:', error);
-            sendResponse(res, 500, false, 'Failed to create content');
+
+            // Provide more specific error messages
+            let errorMessage = 'Failed to create content';
+            if (error instanceof Error) {
+                if (error.message.includes('validation')) {
+                    errorMessage = 'Content validation failed. Please check your input.';
+                } else if (error.message.includes('Facebook')) {
+                    errorMessage = 'Failed to publish to Facebook. Please check your Facebook connection.';
+                } else if (error.message.includes('upload')) {
+                    errorMessage = 'File upload failed. Please try again.';
+                }
+            }
+
+            sendResponse(res, 500, false, errorMessage);
         }
     }
 
@@ -105,6 +118,8 @@ export class ContentController {
             const status = req.query.status as string;
             const postType = req.query.postType as string;
 
+            Logger.info('getUserContent called', { userId, page, limit, status, postType });
+
             const { contents, total } = await ContentService.getUserContent(
                 userId,
                 page,
@@ -112,6 +127,8 @@ export class ContentController {
                 status,
                 postType
             );
+
+            Logger.info('Content retrieved', { contentsCount: contents.length, total });
 
             const responseData = {
                 contents: contents.map(content => ({
@@ -128,7 +145,7 @@ export class ContentController {
                     updatedAt: content.updatedAt.toISOString(),
                     scheduledPost: content.scheduledPost ? {
                         postNumber: content.scheduledPost.postNumber,
-                        scheduledDate: content.scheduledPost.scheduledDate.toISOString().split('T')[0],
+                        scheduledDate: content.scheduledPost.scheduledDate?.toISOString().split('T')[0],
                         scheduledTime: content.scheduledPost.scheduledTime,
                         status: content.scheduledPost.status,
                         publishedAt: content.scheduledPost.publishedAt?.toISOString(),
@@ -144,6 +161,7 @@ export class ContentController {
             sendResponse(res, 200, true, 'Content retrieved successfully', responseData);
         } catch (error) {
             Logger.error('Error in getUserContent controller:', error);
+            console.error('Detailed error:', error);
             sendResponse(res, 500, false, 'Failed to retrieve content');
         }
     }
@@ -181,7 +199,7 @@ export class ContentController {
                 updatedAt: content.updatedAt.toISOString(),
                 scheduledPost: content.scheduledPost ? {
                     postNumber: content.scheduledPost.postNumber,
-                    scheduledDate: content.scheduledPost.scheduledDate.toISOString().split('T')[0],
+                    scheduledDate: content.scheduledPost.scheduledDate?.toISOString().split('T')[0],
                     scheduledTime: content.scheduledPost.scheduledTime,
                     status: content.scheduledPost.status,
                     publishedAt: content.scheduledPost.publishedAt?.toISOString(),

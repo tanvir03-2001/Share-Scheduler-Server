@@ -140,6 +140,7 @@ export const validateCreateContent = (req: Request, res: Response, next: NextFun
     }
 
     next();
+    return;
 };
 
 export const validateUpdateContent = (req: Request, res: Response, next: NextFunction) => {
@@ -234,6 +235,7 @@ export const validateUpdateContent = (req: Request, res: Response, next: NextFun
     }
 
     next();
+    return;
 };
 
 export const validateContentId = (req: Request, res: Response, next: NextFunction) => {
@@ -256,4 +258,5 @@ export const validateContentId = (req: Request, res: Response, next: NextFunctio
     }
 
     next();
+    return;
 };

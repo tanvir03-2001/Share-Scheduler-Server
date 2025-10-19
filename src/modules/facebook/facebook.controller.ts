@@ -220,7 +220,7 @@ export class FacebookController {
 
             return accessiblePages;
         } catch (error) {
-            Logger.warn('Failed to validate Facebook pages access', { userId, error: error.message });
+            Logger.warn('Failed to validate Facebook pages access', { userId, error: (error as Error).message });
             return [];
         }
     }
@@ -853,7 +853,7 @@ export class FacebookController {
             }
 
             if (!pageId) {
-                return ResponseHelper.badRequest(res, 'Page ID is required');
+                return ResponseHelper.error(res, 'Page ID is required', undefined, 400);
             }
 
             // Check if the page exists and belongs to the user

@@ -1,8 +1,17 @@
 import { Request, Response } from 'express';
 import { SchedulerService } from '../../services/scheduler.service';
 import { Logger } from '../../utils/logger';
-import { sendResponse } from '../../utils/response';
+import { ResponseHelper } from '../../utils/response';
 import { ContentService } from './content.service';
+
+// Helper function to match the expected sendResponse signature
+const sendResponse = (res: Response, statusCode: number, success: boolean, message: string, data?: any) => {
+    if (success) {
+        ResponseHelper.success(res, message, data, statusCode);
+    } else {
+        ResponseHelper.error(res, message, undefined, statusCode);
+    }
+};
 
 export class SchedulerController {
     /**
@@ -89,7 +98,7 @@ export class SchedulerController {
             const upcomingPosts = contents
                 .filter(content => content.scheduledPost && content.scheduledPost.status === 'pending')
                 .map(content => ({
-                    id: content._id.toString(),
+                    id: (content._id as any).toString(),
                     postType: content.postType,
                     content: content.content,
                     platforms: content.platforms,
@@ -138,7 +147,7 @@ export class SchedulerController {
             const history = contents
                 .filter(content => content.scheduledPost)
                 .map(content => ({
-                    id: content._id.toString(),
+                    id: (content._id as any).toString(),
                     postType: content.postType,
                     content: content.content,
                     platforms: content.platforms,

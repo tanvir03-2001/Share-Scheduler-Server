@@ -1,4 +1,8 @@
+import mongoose from 'mongoose';
+import { FacebookPostingService } from '../../services/facebook-posting.service';
+import { FacebookService } from '../../services/facebook.service';
 import { Logger } from '../../utils/logger';
+import { FacebookPage } from '../facebook/FacebookPage.model';
 import { Content, IContent, IScheduledPost } from './Content.model';
 import { CreateContentRequest, UpdateContentRequest } from './content.types';
 
@@ -29,8 +33,9 @@ export class ContentService {
             // Get the first media file since we now store only one per content
             const mediaFile = mediaFiles && mediaFiles.length > 0 ? mediaFiles[0] : undefined;
 
+            const userIdObjectId = new mongoose.Types.ObjectId(userId);
             const newContent = new Content({
-                userId,
+                userId: userIdObjectId,
                 postType,
                 content,
                 hashtags,
@@ -50,9 +55,84 @@ export class ContentService {
                 hasCloudinaryFile: mediaFile?.cloudinaryPublicId || false
             });
 
+            // If publishMode is 'now', immediately publish to Facebook
+            if (publishMode === 'now' && platforms.includes('facebook')) {
+                try {
+                    await this.publishContentImmediately(savedContent, userId);
+                } catch (error) {
+                    Logger.error('Error publishing content immediately:', error);
+                    // Don't throw error here, just log it - content is still saved
+                }
+            }
+
             return savedContent;
         } catch (error) {
             Logger.error('Error creating content:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Publish content immediately to Facebook
+     */
+    private static async publishContentImmediately(content: IContent, userId: string): Promise<void> {
+        try {
+            // Get user's active Facebook page
+            const activePage = await FacebookService.getUserActivePage(userId);
+
+            if (!activePage) {
+                Logger.warn('No active Facebook page found for immediate publishing', { userId, contentId: content._id });
+                return;
+            }
+
+            // Prepare content for Facebook posting
+            const facebookContent = {
+                content: content.content,
+                hashtags: content.hashtags,
+                mediaFile: content.mediaFile,
+                pageId: activePage.pageId,
+                accessToken: activePage.accessToken
+            };
+
+            // Post to Facebook
+            const result = await FacebookPostingService.postToFacebook(facebookContent);
+
+            if (result.success && result.postId) {
+                // Update content status and add Facebook post ID
+                await Content.findByIdAndUpdate(content._id, {
+                    status: 'published',
+                    publishedAt: new Date(),
+                    'scheduledPost.facebookPostId': result.postId,
+                    'scheduledPost.status': 'published',
+                    'scheduledPost.publishedAt': new Date()
+                });
+
+                // Update page last used timestamp
+                await FacebookPage.findByIdAndUpdate(activePage._id, {
+                    lastUsedAt: new Date()
+                });
+
+                Logger.info('Content published immediately to Facebook', {
+                    contentId: content._id,
+                    pageId: activePage.pageId,
+                    facebookPostId: result.postId
+                });
+            } else {
+                // Update content status to failed
+                await Content.findByIdAndUpdate(content._id, {
+                    status: 'failed',
+                    'scheduledPost.status': 'failed',
+                    'scheduledPost.error': result.error || 'Unknown error occurred'
+                });
+
+                Logger.error('Failed to publish content immediately to Facebook', {
+                    contentId: content._id,
+                    pageId: activePage.pageId,
+                    error: result.error
+                });
+            }
+        } catch (error) {
+            Logger.error('Error in immediate publishing:', error);
             throw error;
         }
     }
@@ -68,7 +148,11 @@ export class ContentService {
         postType?: string
     ): Promise<{ contents: IContent[], total: number }> {
         try {
-            const query: any = { userId };
+            Logger.info('ContentService.getUserContent called', { userId, page, limit, status, postType });
+
+            // Convert userId string to ObjectId
+            const userIdObjectId = new mongoose.Types.ObjectId(userId);
+            const query: any = { userId: userIdObjectId };
 
             if (status) {
                 query.status = status;
@@ -78,7 +162,11 @@ export class ContentService {
                 query.postType = postType;
             }
 
+            Logger.info('Database query', { query });
+
             const skip = (page - 1) * limit;
+
+            Logger.info('About to execute database queries', { skip, limit });
 
             const [contents, total] = await Promise.all([
                 Content.find(query)
@@ -88,6 +176,8 @@ export class ContentService {
                     .lean() as unknown as IContent[],
                 Content.countDocuments(query)
             ]);
+
+            Logger.info('Database queries completed', { contentsCount: contents.length, total });
 
             return { contents, total };
         } catch (error) {
@@ -101,7 +191,8 @@ export class ContentService {
      */
     static async getContentById(contentId: string, userId: string): Promise<IContent | null> {
         try {
-            const content = await Content.findOne({ _id: contentId, userId }).lean() as unknown as IContent | null;
+            const userIdObjectId = new mongoose.Types.ObjectId(userId);
+            const content = await Content.findOne({ _id: contentId, userId: userIdObjectId }).lean() as unknown as IContent | null;
             return content;
         } catch (error) {
             Logger.error('Error fetching content by ID:', error);
@@ -121,7 +212,8 @@ export class ContentService {
             const { content, hashtags, platforms, publishMode, scheduleDate, scheduleTimes, mediaFiles } = updateData;
 
             // Check if content exists and belongs to user
-            const existingContent = await Content.findOne({ _id: contentId, userId });
+            const userIdObjectId = new mongoose.Types.ObjectId(userId);
+            const existingContent = await Content.findOne({ _id: contentId, userId: userIdObjectId });
             if (!existingContent) {
                 return null;
             }
@@ -174,7 +266,8 @@ export class ContentService {
      */
     static async deleteContent(contentId: string, userId: string): Promise<boolean> {
         try {
-            const result = await Content.findOneAndDelete({ _id: contentId, userId });
+            const userIdObjectId = new mongoose.Types.ObjectId(userId);
+            const result = await Content.findOneAndDelete({ _id: contentId, userId: userIdObjectId });
 
             if (result) {
                 Logger.info('Content deleted successfully', { contentId, userId });

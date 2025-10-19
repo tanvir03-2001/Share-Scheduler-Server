@@ -28,6 +28,35 @@ export class FacebookPostingService {
     private static readonly FACEBOOK_API_BASE = 'https://graph.facebook.com/v18.0';
 
     /**
+     * Get user-friendly error message from Facebook API error
+     */
+    private static getErrorMessage(error: any): string {
+        if (!error) return 'Unknown error occurred';
+
+        let errorMessage = error.message || 'Facebook API error';
+        if (error.code) {
+            switch (error.code) {
+                case 190:
+                    errorMessage = 'Facebook access token expired. Please reconnect your Facebook account.';
+                    break;
+                case 200:
+                    errorMessage = 'Permission denied. Please check your Facebook page permissions.';
+                    break;
+                case 100:
+                    errorMessage = 'Invalid parameter. Please check your content format.';
+                    break;
+                case 368:
+                    errorMessage = 'Facebook page temporarily blocked. Please try again later.';
+                    break;
+                default:
+                    errorMessage = `Facebook API error (${error.code}): ${error.message}`;
+            }
+        }
+
+        return errorMessage;
+    }
+
+    /**
      * Post content to Facebook page
      */
     static async postToFacebook(request: PostToFacebookRequest): Promise<FacebookPostResponse> {
@@ -86,7 +115,7 @@ export class FacebookPostingService {
                 Logger.error('Facebook API error:', result.error);
                 return {
                     success: false,
-                    error: result.error.message || 'Facebook API error'
+                    error: this.getErrorMessage(result.error)
                 };
             }
 
@@ -150,7 +179,7 @@ export class FacebookPostingService {
                 Logger.error('Facebook API error:', result.error);
                 return {
                     success: false,
-                    error: result.error.message || 'Facebook API error'
+                    error: this.getErrorMessage(result.error)
                 };
             }
 
@@ -244,7 +273,7 @@ export class FacebookPostingService {
     /**
      * Get user's Facebook pages
      */
-    static async getUserPages(userId: string): Promise<FacebookPage[]> {
+    static async getUserPages(userId: string): Promise<any[]> {
         try {
             const facebookUser = await FacebookUser.findOne({ userId });
             if (!facebookUser || !facebookUser.accessToken) {

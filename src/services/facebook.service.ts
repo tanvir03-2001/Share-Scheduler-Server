@@ -1,4 +1,5 @@
 import fetch from 'node-fetch';
+import { FacebookPage } from '../modules/facebook/FacebookPage.model';
 import { RetryUtil } from '../utils/retry.util';
 
 export interface FacebookPageData {
@@ -548,5 +549,32 @@ export class FacebookService {
         }
 
         return await response.json();
+    }
+
+    /**
+     * Get user's active Facebook page for posting
+     */
+    static async getUserActivePage(userId: string): Promise<any> {
+        try {
+            // First try to find the default active page
+            let activePage = await FacebookPage.findOne({
+                userId,
+                isActive: true,
+                isDefaultActive: true
+            });
+
+            // If no default active page, find any active page
+            if (!activePage) {
+                activePage = await FacebookPage.findOne({
+                    userId,
+                    isActive: true
+                });
+            }
+
+            return activePage;
+        } catch (error) {
+            console.error('Error getting user active page:', error);
+            return null;
+        }
     }
 }

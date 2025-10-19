@@ -1,8 +1,9 @@
-import cron from 'node-cron';
+import * as cron from 'node-cron';
 import { ContentService } from '../modules/content/content.service';
 import { FacebookPage } from '../modules/facebook/FacebookPage.model';
 import { Logger } from '../utils/logger';
 import { FacebookPostingService } from './facebook-posting.service';
+import { FacebookService } from './facebook.service';
 
 export class SchedulerService {
     private static isRunning = false;
@@ -20,8 +21,6 @@ export class SchedulerService {
         // Run every minute to check for scheduled posts
         this.cronJob = cron.schedule('* * * * *', async () => {
             await this.processScheduledPosts();
-        }, {
-            scheduled: false
         });
 
         this.cronJob.start();
@@ -106,17 +105,18 @@ export class SchedulerService {
         pages: any[]
     ): Promise<void> {
         try {
-            // Find the appropriate page (for now, use the first page)
-            const page = pages.find(p => content.platforms.includes('facebook')) || pages[0];
+            // Get user's active Facebook page
+            const userId = content.userId._id || content.userId;
+            const activePage = await FacebookService.getUserActivePage(userId);
 
-            if (!page) {
-                Logger.warn('No suitable Facebook page found', { contentId: content._id });
+            if (!activePage) {
+                Logger.warn('No active Facebook page found for scheduled publishing', { contentId: content._id, userId });
                 await ContentService.updateScheduledPostStatus(
                     content._id.toString(),
                     scheduledPost.postNumber,
                     'failed',
                     undefined,
-                    'No Facebook page found'
+                    'No active Facebook page found'
                 );
                 return;
             }
@@ -126,8 +126,8 @@ export class SchedulerService {
                 content: content.content,
                 hashtags: content.hashtags,
                 mediaFile: content.mediaFile,
-                pageId: page.pageId,
-                accessToken: page.accessToken
+                pageId: activePage.pageId,
+                accessToken: activePage.accessToken
             };
 
             // Post to Facebook
@@ -141,10 +141,16 @@ export class SchedulerService {
                     result.postId
                 );
 
+                // Update page last used timestamp
+                await FacebookPage.findByIdAndUpdate(activePage._id, {
+                    lastUsedAt: new Date()
+                });
+
                 Logger.info('Scheduled post published successfully', {
                     contentId: content._id,
                     postNumber: scheduledPost.postNumber,
-                    facebookPostId: result.postId
+                    facebookPostId: result.postId,
+                    pageId: activePage.pageId
                 });
             } else {
                 await ContentService.updateScheduledPostStatus(
@@ -189,7 +195,7 @@ export class SchedulerService {
     static getStatus(): { isRunning: boolean; nextRun?: Date } {
         return {
             isRunning: this.isRunning,
-            nextRun: this.cronJob ? this.cronJob.nextDate() : undefined
+            nextRun: this.cronJob ? new Date(Date.now() + 60000) : undefined
         };
     }
 
