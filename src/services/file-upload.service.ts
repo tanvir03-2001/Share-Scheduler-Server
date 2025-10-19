@@ -124,11 +124,10 @@ export class FileUploadService {
                 // Clean up local file after successful upload
                 await this.deleteLocalFile(file.path);
 
-                // Generate thumbnail URL for videos
-                let thumbnailUrl: string | undefined;
-                if (file.mimetype.startsWith('video/')) {
-                    thumbnailUrl = CloudinaryService.getCloudinaryThumbnail(cloudinaryResult.secure_url, 5);
-                    Logger.info('Generated thumbnail URL for video', {
+                // Use the thumbnailUrl from Cloudinary result (already generated)
+                const thumbnailUrl = cloudinaryResult.thumbnailUrl;
+                if (thumbnailUrl) {
+                    Logger.info('Using thumbnail URL from Cloudinary', {
                         videoUrl: cloudinaryResult.secure_url,
                         thumbnailUrl
                     });

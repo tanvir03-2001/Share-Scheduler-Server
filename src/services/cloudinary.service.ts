@@ -17,6 +17,7 @@ export interface CloudinaryUploadResult {
     width?: number;
     height?: number;
     duration?: number;
+    thumbnailUrl?: string;
 }
 
 export class CloudinaryService {
@@ -53,6 +54,20 @@ export class CloudinaryService {
                 resource_type: result.resource_type
             });
 
+            // Generate thumbnail URL
+            const thumbnailUrl = this.generateThumbnailUrl(result.secure_url);
+            // Console log the full response
+            console.log('data', JSON.stringify({
+                public_id: result.public_id,
+                secure_url: result.secure_url,
+                format: result.format,
+                resource_type: result.resource_type,
+                bytes: result.bytes,
+                width: result.width,
+                height: result.height,
+                duration: result.duration,
+                thumbnailUrl
+            }));
             return {
                 public_id: result.public_id,
                 secure_url: result.secure_url,
@@ -61,7 +76,8 @@ export class CloudinaryService {
                 bytes: result.bytes,
                 width: result.width,
                 height: result.height,
-                duration: result.duration
+                duration: result.duration,
+                thumbnailUrl
             };
         } catch (error) {
             Logger.error('Error uploading file to Cloudinary:', error);
@@ -101,6 +117,9 @@ export class CloudinaryService {
                             // Console log the full response
                             console.log('Cloudinary Upload Response (from buffer):', JSON.stringify(result, null, 2));
 
+                            // Generate thumbnail URL
+                            const thumbnailUrl = this.generateThumbnailUrl(result.secure_url);
+
                             resolve({
                                 public_id: result.public_id,
                                 secure_url: result.secure_url,
@@ -109,7 +128,8 @@ export class CloudinaryService {
                                 bytes: result.bytes,
                                 width: result.width,
                                 height: result.height,
-                                duration: result.duration
+                                duration: result.duration,
+                                thumbnailUrl
                             });
                         } else {
                             reject(new Error('Upload failed'));
@@ -170,20 +190,64 @@ export class CloudinaryService {
     }
 
     /**
-     * Generate thumbnail URL from Cloudinary video URL
+     * Generate thumbnail URL from Cloudinary URL
      */
-    static getCloudinaryThumbnail(videoUrl: string, second: number = 0): string {
+    static generateThumbnailUrl(input: string, opts: any = {}): string {
         try {
-            // Replace .mp4 with .jpg
-            let base = videoUrl.replace('.mp4', '.jpg');
+            const defaultOpts = { width: 200, height: 200, crop: 'fill', gravity: 'auto' };
+            const { width, height, crop, gravity, start_offset } = { ...defaultOpts, ...opts };
 
-            // If specific time frame is requested
-            if (second > 0) {
-                base = base.replace('/upload/', `/upload/so_${second}/`);
+            // Extract public_id from URL
+            const extractPublicId = (input: string) => {
+                if (!/^https?:\/\//i.test(input) && !input.includes('/')) return input;
+                try {
+                    const url = new URL(input);
+                    const parts = url.pathname.split('/').filter(Boolean);
+                    const uploadIdx = parts.findIndex(p => p === 'upload');
+                    let afterUpload = parts.slice(uploadIdx + 1);
+                    if (afterUpload.length && /^v\d+$/.test(afterUpload[0])) afterUpload.shift();
+                    const joined = afterUpload.join('/');
+                    return joined.replace(/\.[a-z0-9]+(\?.*)?$/i, '');
+                } catch (e) {
+                    return input;
+                }
+            };
+
+            const publicId = extractPublicId(input);
+
+            // Auto-detect resource type
+            let resourceType = 'image';
+            const lower = input.toLowerCase();
+            if (/\.(mp4|mov|webm|mkv|avi|flv|wmv)$/.test(lower)) {
+                resourceType = 'video';
             }
 
-            Logger.info('Generated thumbnail URL', { videoUrl, second, thumbnailUrl: base });
-            return base;
+            if (resourceType === 'video') {
+                const transformation: any[] = [];
+                if (start_offset !== undefined && start_offset !== null) transformation.push({ start_offset });
+                transformation.push({ width, height, crop, gravity });
+
+                const thumbnailUrl = cloudinary.url(publicId, {
+                    resource_type: 'video',
+                    format: 'jpg',
+                    transformation,
+                });
+
+                Logger.info('Generated video thumbnail URL', { input, publicId, thumbnailUrl });
+                return thumbnailUrl;
+            }
+
+            // For images
+            const thumbnailUrl = cloudinary.url(publicId, {
+                width,
+                height,
+                crop,
+                gravity,
+                format: 'jpg',
+            });
+
+            Logger.info('Generated image thumbnail URL', { input, publicId, thumbnailUrl });
+            return thumbnailUrl;
         } catch (error) {
             Logger.error('Error generating thumbnail URL:', error);
             throw new Error('Failed to generate thumbnail URL');

@@ -153,8 +153,8 @@ const ContentSchema = new Schema<IContent>({
     toJSON: {
         transform: function (doc, ret) {
             ret.id = ret._id;
-            if (ret._id !== undefined) delete ret._id;
-            if (ret.__v !== undefined) delete ret.__v;
+            delete (ret as any)._id;
+            delete (ret as any).__v;
             return ret;
         }
     }
