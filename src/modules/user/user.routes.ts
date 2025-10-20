@@ -1,9 +1,8 @@
 import { Router } from 'express';
 import { AuthMiddleware } from '../../middleware/auth.middleware';
-import { UserController } from './user.controller';
+import * as UserController from './user.controller';
 
 const router = Router();
-const userController = new UserController();
 
 // All user routes require authentication
 router.use(AuthMiddleware.authenticate);
@@ -11,23 +10,23 @@ router.use(AuthMiddleware.authenticate);
 // Get all users (admin only)
 router.get('/',
     AuthMiddleware.authorize(['admin']),
-    userController.getAllUsers
+    UserController.getAllUsers
 );
 
 // Get user by ID
 router.get('/:id',
-    userController.getUserById
+    UserController.getUserById
 );
 
 // Update user
 router.put('/:id',
-    userController.updateUser
+    UserController.updateUser
 );
 
 // Delete user (admin only)
 router.delete('/:id',
     AuthMiddleware.authorize(['admin']),
-    userController.deleteUser
+    UserController.deleteUser
 );
 
 export default router;

@@ -4,76 +4,72 @@ import { Logger } from '../../utils/logger';
 import { ResponseHelper } from '../../utils/response';
 import { UserService } from './user.service';
 
-export class UserController {
-    private userService: UserService;
-
-    constructor() {
-        this.userService = new UserService();
+// Get all users (admin only)
+export const getAllUsers = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const userService = new UserService();
+        const users = await userService.getAllUsers();
+        ResponseHelper.success(res, 'Users retrieved successfully', users);
+    } catch (error: any) {
+        Logger.error('Get all users error:', error);
+        ResponseHelper.error(res, error.message || 'Failed to get users', error);
     }
+};
 
-    // Get all users (admin only)
-    getAllUsers = async (req: Request, res: Response): Promise<void> => {
-        try {
-            const users = await this.userService.getAllUsers();
-            ResponseHelper.success(res, 'Users retrieved successfully', users);
-        } catch (error: any) {
-            Logger.error('Get all users error:', error);
-            ResponseHelper.error(res, error.message || 'Failed to get users', error);
+// Get user by ID
+export const getUserById = async (req: JWTAuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+        const { id } = req.params;
+        const userService = new UserService();
+        const user = await userService.getUserById(id);
+
+        if (!user) {
+            return ResponseHelper.notFound(res, 'User not found');
         }
-    };
 
-    // Get user by ID
-    getUserById = async (req: JWTAuthenticatedRequest, res: Response): Promise<void> => {
-        try {
-            const { id } = req.params;
-            const user = await this.userService.getUserById(id);
+        ResponseHelper.success(res, 'User retrieved successfully', user);
+    } catch (error: any) {
+        Logger.error('Get user by ID error:', error);
+        ResponseHelper.error(res, error.message || 'Failed to get user', error);
+    }
+};
 
-            if (!user) {
-                return ResponseHelper.notFound(res, 'User not found');
-            }
+// Update user
+export const updateUser = async (req: JWTAuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+        const { id } = req.params;
+        const updateData = req.body;
+        const userService = new UserService();
 
-            ResponseHelper.success(res, 'User retrieved successfully', user);
-        } catch (error: any) {
-            Logger.error('Get user by ID error:', error);
-            ResponseHelper.error(res, error.message || 'Failed to get user', error);
+        const updatedUser = await userService.updateUser(id, updateData);
+
+        if (!updatedUser) {
+            return ResponseHelper.notFound(res, 'User not found');
         }
-    };
 
-    // Update user
-    updateUser = async (req: JWTAuthenticatedRequest, res: Response): Promise<void> => {
-        try {
-            const { id } = req.params;
-            const updateData = req.body;
+        ResponseHelper.success(res, 'User updated successfully', updatedUser);
+    } catch (error: any) {
+        Logger.error('Update user error:', error);
+        ResponseHelper.error(res, error.message || 'Failed to update user', error);
+    }
+};
 
-            const updatedUser = await this.userService.updateUser(id, updateData);
+// Delete user
+export const deleteUser = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { id } = req.params;
+        const userService = new UserService();
 
-            if (!updatedUser) {
-                return ResponseHelper.notFound(res, 'User not found');
-            }
+        const deleted = await userService.deleteUser(id);
 
-            ResponseHelper.success(res, 'User updated successfully', updatedUser);
-        } catch (error: any) {
-            Logger.error('Update user error:', error);
-            ResponseHelper.error(res, error.message || 'Failed to update user', error);
+        if (!deleted) {
+            return ResponseHelper.notFound(res, 'User not found');
         }
-    };
 
-    // Delete user
-    deleteUser = async (req: Request, res: Response): Promise<void> => {
-        try {
-            const { id } = req.params;
-
-            const deleted = await this.userService.deleteUser(id);
-
-            if (!deleted) {
-                return ResponseHelper.notFound(res, 'User not found');
-            }
-
-            ResponseHelper.success(res, 'User deleted successfully');
-        } catch (error: any) {
-            Logger.error('Delete user error:', error);
-            ResponseHelper.error(res, error.message || 'Failed to delete user', error);
-        }
-    };
-}
+        ResponseHelper.success(res, 'User deleted successfully');
+    } catch (error: any) {
+        Logger.error('Delete user error:', error);
+        ResponseHelper.error(res, error.message || 'Failed to delete user', error);
+    }
+};
 

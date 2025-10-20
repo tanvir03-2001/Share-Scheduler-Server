@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import { AuthMiddleware } from '../../middleware/auth.middleware';
 import { upload } from '../../services/file-upload.service';
-import { ContentController } from './content.controller';
+import * as ContentController from './content.controller';
 import { validateContentId, validateCreateContent, validateUpdateContent } from './content.validator';
-import { SchedulerController } from './scheduler.controller';
+import * as SchedulerController from './scheduler.controller';
 
 const router = Router();
 

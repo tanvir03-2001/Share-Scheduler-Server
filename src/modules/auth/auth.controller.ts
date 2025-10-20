@@ -5,319 +5,320 @@ import { Logger } from '../../utils/logger';
 import { ResponseHelper } from '../../utils/response';
 import { AuthService } from './auth.service';
 
-export class AuthController {
-    private authService: AuthService;
-    private jwtService: JWTService;
+// Register a new user
+export const register = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { email, password, name, acceptPrivacyPolicy } = req.body;
+        const authService = new AuthService();
 
-    constructor() {
-        this.authService = new AuthService();
-        this.jwtService = new JWTService();
+        Logger.info('User registration attempt', { email });
+
+        const result = await authService.register({ email, password, name, acceptPrivacyPolicy });
+
+        ResponseHelper.success(res, 'User registered successfully', result, 201);
+    } catch (error: any) {
+        Logger.error('Registration error:', error);
+        ResponseHelper.error(res, error.message || 'Registration failed', error, 400);
     }
+};
 
-    // Register a new user
-    register = async (req: Request, res: Response): Promise<void> => {
-        try {
-            const { email, password, name, acceptPrivacyPolicy } = req.body;
+// Login user
+export const login = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { email, password } = req.body;
+        const authService = new AuthService();
 
-            Logger.info('User registration attempt', { email });
+        Logger.info('User login attempt', { email });
 
-            const result = await this.authService.register({ email, password, name, acceptPrivacyPolicy });
+        const result = await authService.login(email, password);
 
-            ResponseHelper.success(res, 'User registered successfully', result, 201);
-        } catch (error: any) {
-            Logger.error('Registration error:', error);
-            ResponseHelper.error(res, error.message || 'Registration failed', error, 400);
+        // Set HTTP-only cookies for tokens
+        const cookieOptions = {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: (process.env.NODE_ENV === 'production' ? 'none' : 'lax') as 'none' | 'lax',
+            maxAge: 24 * 60 * 60 * 1000, // 1 day
+            path: '/',
+            domain: process.env.NODE_ENV === 'production' ? undefined : undefined // Let browser handle domain
+        };
+
+        res.cookie('access_token', result.accessToken, cookieOptions);
+
+        res.cookie('refresh_token', result.refreshToken, {
+            ...cookieOptions,
+            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        });
+
+        // Return user data without tokens
+        const { accessToken, refreshToken, ...userData } = result;
+        ResponseHelper.success(res, 'Login successful', userData);
+    } catch (error: any) {
+        Logger.error('Login error:', error);
+        ResponseHelper.error(res, error.message || 'Login failed', error, 401);
+    }
+};
+
+// Logout user
+export const logout = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const refreshToken = req.cookies.refresh_token;
+        const authService = new AuthService();
+
+        if (refreshToken) {
+            await authService.logout(refreshToken);
         }
-    };
 
-    // Login user
-    login = async (req: Request, res: Response): Promise<void> => {
-        try {
-            const { email, password } = req.body;
+        // Clear cookies with consistent options
+        const clearCookieOptions = {
+            path: '/',
+            domain: process.env.NODE_ENV === 'production' ? undefined : undefined
+        };
 
-            Logger.info('User login attempt', { email });
+        res.clearCookie('access_token', clearCookieOptions);
+        res.clearCookie('refresh_token', clearCookieOptions);
 
-            const result = await this.authService.login(email, password);
+        ResponseHelper.success(res, 'Logout successful');
+    } catch (error: any) {
+        Logger.error('Logout error:', error);
+        // Clear cookies even if logout fails
+        const clearCookieOptions = {
+            path: '/',
+            domain: process.env.NODE_ENV === 'production' ? undefined : undefined
+        };
 
-            // Set HTTP-only cookies for tokens
-            const cookieOptions = {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: (process.env.NODE_ENV === 'production' ? 'none' : 'lax') as 'none' | 'lax',
-                maxAge: 24 * 60 * 60 * 1000, // 1 day
-                path: '/',
-                domain: process.env.NODE_ENV === 'production' ? undefined : undefined // Let browser handle domain
-            };
+        res.clearCookie('access_token', clearCookieOptions);
+        res.clearCookie('refresh_token', clearCookieOptions);
+        ResponseHelper.error(res, 'Logout failed', error);
+    }
+};
 
-            res.cookie('access_token', result.accessToken, cookieOptions);
+// Refresh access token
+export const refreshToken = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const refreshToken = req.cookies.refresh_token;
+        const authService = new AuthService();
 
-            res.cookie('refresh_token', result.refreshToken, {
-                ...cookieOptions,
-                maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-            });
-
-            // Return user data without tokens
-            const { accessToken, refreshToken, ...userData } = result;
-            ResponseHelper.success(res, 'Login successful', userData);
-        } catch (error: any) {
-            Logger.error('Login error:', error);
-            ResponseHelper.error(res, error.message || 'Login failed', error, 401);
+        if (!refreshToken) {
+            return ResponseHelper.error(res, 'Refresh token is required', null, 400);
         }
-    };
 
-    // Logout user
-    logout = async (req: Request, res: Response): Promise<void> => {
-        try {
-            const refreshToken = req.cookies.refresh_token;
+        Logger.info('Token refresh attempt');
 
-            if (refreshToken) {
-                await this.authService.logout(refreshToken);
-            }
+        const result = await authService.refreshAccessToken(refreshToken);
 
-            // Clear cookies with consistent options
-            const clearCookieOptions = {
-                path: '/',
-                domain: process.env.NODE_ENV === 'production' ? undefined : undefined
-            };
+        // Set new cookies with consistent options
+        const cookieOptions = {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: (process.env.NODE_ENV === 'production' ? 'none' : 'lax') as 'none' | 'lax',
+            maxAge: 24 * 60 * 60 * 1000, // 1 day
+            path: '/',
+            domain: process.env.NODE_ENV === 'production' ? undefined : undefined // Let browser handle domain
+        };
 
-            res.clearCookie('access_token', clearCookieOptions);
-            res.clearCookie('refresh_token', clearCookieOptions);
+        res.cookie('access_token', result.accessToken, cookieOptions);
 
-            ResponseHelper.success(res, 'Logout successful');
-        } catch (error: any) {
-            Logger.error('Logout error:', error);
-            // Clear cookies even if logout fails
-            const clearCookieOptions = {
-                path: '/',
-                domain: process.env.NODE_ENV === 'production' ? undefined : undefined
-            };
+        res.cookie('refresh_token', result.refreshToken, {
+            ...cookieOptions,
+            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        });
 
-            res.clearCookie('access_token', clearCookieOptions);
-            res.clearCookie('refresh_token', clearCookieOptions);
-            ResponseHelper.error(res, 'Logout failed', error);
+        ResponseHelper.success(res, 'Token refreshed successfully');
+    } catch (error: any) {
+        Logger.error('Token refresh error:', error);
+        // Clear cookies on refresh failure
+        const clearCookieOptions = {
+            path: '/',
+            domain: process.env.NODE_ENV === 'production' ? undefined : undefined
+        };
+
+        res.clearCookie('access_token', clearCookieOptions);
+        res.clearCookie('refresh_token', clearCookieOptions);
+        ResponseHelper.error(res, error.message || 'Token refresh failed', error, 401);
+    }
+};
+
+// Logout from all devices
+export const logoutAllDevices = async (req: JWTAuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+        const userId = req.jwtUser?.id;
+        const authService = new AuthService();
+
+        if (!userId) {
+            return ResponseHelper.unauthorized(res, 'User not authenticated');
         }
-    };
 
-    // Refresh access token
-    refreshToken = async (req: Request, res: Response): Promise<void> => {
-        try {
-            const refreshToken = req.cookies.refresh_token;
+        await authService.logoutAllDevices(userId);
 
-            if (!refreshToken) {
-                return ResponseHelper.error(res, 'Refresh token is required', null, 400);
-            }
+        ResponseHelper.success(res, 'Logged out from all devices successfully');
+    } catch (error: any) {
+        Logger.error('Logout all devices error:', error);
+        ResponseHelper.error(res, 'Logout failed', error);
+    }
+};
 
-            Logger.info('Token refresh attempt');
+// Get user profile
+export const getProfile = async (req: JWTAuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+        const userId = req.jwtUser?.id;
+        const authService = new AuthService();
 
-            const result = await this.authService.refreshAccessToken(refreshToken);
-
-            // Set new cookies with consistent options
-            const cookieOptions = {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: (process.env.NODE_ENV === 'production' ? 'none' : 'lax') as 'none' | 'lax',
-                maxAge: 24 * 60 * 60 * 1000, // 1 day
-                path: '/',
-                domain: process.env.NODE_ENV === 'production' ? undefined : undefined // Let browser handle domain
-            };
-
-            res.cookie('access_token', result.accessToken, cookieOptions);
-
-            res.cookie('refresh_token', result.refreshToken, {
-                ...cookieOptions,
-                maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-            });
-
-            ResponseHelper.success(res, 'Token refreshed successfully');
-        } catch (error: any) {
-            Logger.error('Token refresh error:', error);
-            // Clear cookies on refresh failure
-            const clearCookieOptions = {
-                path: '/',
-                domain: process.env.NODE_ENV === 'production' ? undefined : undefined
-            };
-
-            res.clearCookie('access_token', clearCookieOptions);
-            res.clearCookie('refresh_token', clearCookieOptions);
-            ResponseHelper.error(res, error.message || 'Token refresh failed', error, 401);
+        if (!userId) {
+            return ResponseHelper.unauthorized(res, 'User not authenticated');
         }
-    };
 
-    // Logout from all devices
-    logoutAllDevices = async (req: JWTAuthenticatedRequest, res: Response): Promise<void> => {
-        try {
-            const userId = req.jwtUser?.id;
+        const user = await authService.getUserProfile(userId);
 
-            if (!userId) {
-                return ResponseHelper.unauthorized(res, 'User not authenticated');
-            }
+        ResponseHelper.success(res, 'Profile retrieved successfully', user);
+    } catch (error: any) {
+        Logger.error('Get profile error:', error);
+        ResponseHelper.error(res, error.message || 'Failed to get profile', error);
+    }
+};
 
-            await this.authService.logoutAllDevices(userId);
+// Update user profile
+export const updateProfile = async (req: JWTAuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+        const userId = req.jwtUser?.id;
+        const updateData = req.body;
+        const authService = new AuthService();
 
-            ResponseHelper.success(res, 'Logged out from all devices successfully');
-        } catch (error: any) {
-            Logger.error('Logout all devices error:', error);
-            ResponseHelper.error(res, 'Logout failed', error);
+        if (!userId) {
+            return ResponseHelper.unauthorized(res, 'User not authenticated');
         }
-    };
 
-    // Get user profile
-    getProfile = async (req: JWTAuthenticatedRequest, res: Response): Promise<void> => {
-        try {
-            const userId = req.jwtUser?.id;
+        const updatedUser = await authService.updateUserProfile(userId, updateData);
 
-            if (!userId) {
-                return ResponseHelper.unauthorized(res, 'User not authenticated');
-            }
+        ResponseHelper.success(res, 'Profile updated successfully', updatedUser);
+    } catch (error: any) {
+        Logger.error('Update profile error:', error);
+        ResponseHelper.error(res, error.message || 'Failed to update profile', error);
+    }
+};
 
-            const user = await this.authService.getUserProfile(userId);
+// Forgot password
+export const forgotPassword = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { email } = req.body;
+        const authService = new AuthService();
 
-            ResponseHelper.success(res, 'Profile retrieved successfully', user);
-        } catch (error: any) {
-            Logger.error('Get profile error:', error);
-            ResponseHelper.error(res, error.message || 'Failed to get profile', error);
+        Logger.info('Forgot password request', { email });
+
+        await authService.forgotPassword(email);
+
+        ResponseHelper.success(res, 'Password reset email sent');
+    } catch (error: any) {
+        Logger.error('Forgot password error:', error);
+        ResponseHelper.error(res, error.message || 'Failed to process forgot password request', error);
+    }
+};
+
+// Reset password
+export const resetPassword = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { token, newPassword } = req.body;
+        const authService = new AuthService();
+
+        Logger.info('Password reset attempt');
+
+        await authService.resetPassword(token, newPassword);
+
+        ResponseHelper.success(res, 'Password reset successfully');
+    } catch (error: any) {
+        Logger.error('Reset password error:', error);
+        ResponseHelper.error(res, error.message || 'Failed to reset password', error);
+    }
+};
+
+// Verify email
+export const verifyEmail = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { token } = req.body;
+        const authService = new AuthService();
+
+        Logger.info('Email verification attempt');
+
+        const result = await authService.verifyEmail(token);
+
+        ResponseHelper.success(res, result.message, result.user);
+    } catch (error: any) {
+        Logger.error('Email verification error:', error);
+        ResponseHelper.error(res, error.message || 'Failed to verify email', error, 400);
+    }
+};
+
+// Resend verification email
+export const resendVerificationEmail = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { email } = req.body;
+        const authService = new AuthService();
+
+        Logger.info('Resend verification email request', { email });
+
+        await authService.resendVerificationEmail(email);
+
+        ResponseHelper.success(res, 'Verification email sent successfully');
+    } catch (error: any) {
+        Logger.error('Resend verification email error:', error);
+        ResponseHelper.error(res, error.message || 'Failed to resend verification email', error, 400);
+    }
+};
+
+// Facebook OAuth callback
+export const facebookCallback = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const user = (req as any).user;
+
+        if (!user) {
+            return ResponseHelper.error(res, 'Facebook authentication failed', null, 401);
         }
-    };
 
-    // Update user profile
-    updateProfile = async (req: JWTAuthenticatedRequest, res: Response): Promise<void> => {
-        try {
-            const userId = req.jwtUser?.id;
-            const updateData = req.body;
+        Logger.info('Facebook authentication successful', { userId: user._id, email: user.email });
 
-            if (!userId) {
-                return ResponseHelper.unauthorized(res, 'User not authenticated');
-            }
+        // Generate JWT tokens
+        const tokens = JWTService.generateTokenPair({
+            userId: (user._id as any).toString(),
+            email: user.email,
+            role: user.role
+        });
 
-            const updatedUser = await this.authService.updateUserProfile(userId, updateData);
+        // Store refresh token in database
+        const { RefreshToken } = await import('./RefreshToken.model');
+        const refreshTokenDoc = new RefreshToken({
+            token: tokens.refreshToken,
+            userId: user._id,
+            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
+        });
+        await refreshTokenDoc.save();
 
-            ResponseHelper.success(res, 'Profile updated successfully', updatedUser);
-        } catch (error: any) {
-            Logger.error('Update profile error:', error);
-            ResponseHelper.error(res, error.message || 'Failed to update profile', error);
-        }
-    };
+        // Update last login
+        user.lastLogin = new Date();
+        await user.save();
 
-    // Forgot password
-    forgotPassword = async (req: Request, res: Response): Promise<void> => {
-        try {
-            const { email } = req.body;
+        // Set HTTP-only cookies
+        const cookieOptions = {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: (process.env.NODE_ENV === 'production' ? 'none' : 'lax') as 'none' | 'lax',
+            maxAge: 24 * 60 * 60 * 1000, // 1 day
+            path: '/',
+            domain: process.env.NODE_ENV === 'production' ? undefined : undefined
+        };
 
-            Logger.info('Forgot password request', { email });
+        res.cookie('access_token', tokens.accessToken, cookieOptions);
+        res.cookie('refresh_token', tokens.refreshToken, {
+            ...cookieOptions,
+            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        });
 
-            await this.authService.forgotPassword(email);
+        // Redirect to frontend with success
+        const frontendUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+        res.redirect(`${frontendUrl}/dashboard?auth=success`);
 
-            ResponseHelper.success(res, 'Password reset email sent');
-        } catch (error: any) {
-            Logger.error('Forgot password error:', error);
-            ResponseHelper.error(res, error.message || 'Failed to process forgot password request', error);
-        }
-    };
-
-    // Reset password
-    resetPassword = async (req: Request, res: Response): Promise<void> => {
-        try {
-            const { token, newPassword } = req.body;
-
-            Logger.info('Password reset attempt');
-
-            await this.authService.resetPassword(token, newPassword);
-
-            ResponseHelper.success(res, 'Password reset successfully');
-        } catch (error: any) {
-            Logger.error('Reset password error:', error);
-            ResponseHelper.error(res, error.message || 'Failed to reset password', error);
-        }
-    };
-
-    // Verify email
-    verifyEmail = async (req: Request, res: Response): Promise<void> => {
-        try {
-            const { token } = req.body;
-
-            Logger.info('Email verification attempt');
-
-            const result = await this.authService.verifyEmail(token);
-
-            ResponseHelper.success(res, result.message, result.user);
-        } catch (error: any) {
-            Logger.error('Email verification error:', error);
-            ResponseHelper.error(res, error.message || 'Failed to verify email', error, 400);
-        }
-    };
-
-    // Resend verification email
-    resendVerificationEmail = async (req: Request, res: Response): Promise<void> => {
-        try {
-            const { email } = req.body;
-
-            Logger.info('Resend verification email request', { email });
-
-            await this.authService.resendVerificationEmail(email);
-
-            ResponseHelper.success(res, 'Verification email sent successfully');
-        } catch (error: any) {
-            Logger.error('Resend verification email error:', error);
-            ResponseHelper.error(res, error.message || 'Failed to resend verification email', error, 400);
-        }
-    };
-
-    // Facebook OAuth callback
-    facebookCallback = async (req: Request, res: Response): Promise<void> => {
-        try {
-            const user = (req as any).user;
-
-            if (!user) {
-                return ResponseHelper.error(res, 'Facebook authentication failed', null, 401);
-            }
-
-            Logger.info('Facebook authentication successful', { userId: user._id, email: user.email });
-
-            // Generate JWT tokens
-            const tokens = JWTService.generateTokenPair({
-                userId: (user._id as any).toString(),
-                email: user.email,
-                role: user.role
-            });
-
-            // Store refresh token in database
-            const { RefreshToken } = await import('./RefreshToken.model');
-            const refreshTokenDoc = new RefreshToken({
-                token: tokens.refreshToken,
-                userId: user._id,
-                expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
-            });
-            await refreshTokenDoc.save();
-
-            // Update last login
-            user.lastLogin = new Date();
-            await user.save();
-
-            // Set HTTP-only cookies
-            const cookieOptions = {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: (process.env.NODE_ENV === 'production' ? 'none' : 'lax') as 'none' | 'lax',
-                maxAge: 24 * 60 * 60 * 1000, // 1 day
-                path: '/',
-                domain: process.env.NODE_ENV === 'production' ? undefined : undefined
-            };
-
-            res.cookie('access_token', tokens.accessToken, cookieOptions);
-            res.cookie('refresh_token', tokens.refreshToken, {
-                ...cookieOptions,
-                maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-            });
-
-            // Redirect to frontend with success
-            const frontendUrl = process.env.CLIENT_URL || 'http://localhost:3000';
-            res.redirect(`${frontendUrl}/dashboard?auth=success`);
-
-        } catch (error: any) {
-            Logger.error('Facebook callback error:', error);
-            const frontendUrl = process.env.CLIENT_URL || 'http://localhost:3000';
-            res.redirect(`${frontendUrl}/login?error=facebook_auth_failed`);
-        }
-    };
-}
+    } catch (error: any) {
+        Logger.error('Facebook callback error:', error);
+        const frontendUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+        res.redirect(`${frontendUrl}/login?error=facebook_auth_failed`);
+    }
+};
 

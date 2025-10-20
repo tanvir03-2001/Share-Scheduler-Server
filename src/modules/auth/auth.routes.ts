@@ -2,51 +2,50 @@ import { Router } from 'express';
 import passport from 'passport';
 import { AuthMiddleware } from '../../middleware/auth.middleware';
 import { ValidationMiddleware } from '../../middleware/validation.middleware';
-import { AuthController } from './auth.controller';
+import * as AuthController from './auth.controller';
 
 const router = Router();
-const authController = new AuthController();
 
 // Public routes
 router.post('/register',
     ValidationMiddleware.validateRequired(['email', 'password', 'name']),
     ValidationMiddleware.validateEmailFormat,
     ValidationMiddleware.validatePasswordStrength,
-    authController.register
+    AuthController.register
 );
 
 router.post('/login',
     ValidationMiddleware.validateRequired(['email', 'password']),
     ValidationMiddleware.validateEmailFormat,
-    authController.login
+    AuthController.login
 );
 
 router.post('/forgot-password',
     ValidationMiddleware.validateRequired(['email']),
     ValidationMiddleware.validateEmailFormat,
-    authController.forgotPassword
+    AuthController.forgotPassword
 );
 
 router.post('/reset-password',
     ValidationMiddleware.validateRequired(['token', 'newPassword']),
     ValidationMiddleware.validatePasswordStrength,
-    authController.resetPassword
+    AuthController.resetPassword
 );
 
 router.post('/verify-email',
     ValidationMiddleware.validateRequired(['token']),
-    authController.verifyEmail
+    AuthController.verifyEmail
 );
 
 router.post('/resend-verification',
     ValidationMiddleware.validateRequired(['email']),
     ValidationMiddleware.validateEmailFormat,
-    authController.resendVerificationEmail
+    AuthController.resendVerificationEmail
 );
 
 // Token refresh route (public)
 router.post('/refresh-token',
-    authController.refreshToken
+    AuthController.refreshToken
 );
 
 // Facebook Business OAuth routes
@@ -61,27 +60,27 @@ router.get('/facebook',
 
 router.get('/facebook/callback',
     passport.authenticate('facebook', { failureRedirect: '/login?error=facebook_auth_failed' }),
-    authController.facebookCallback
+    AuthController.facebookCallback
 );
 
 // Protected routes
 router.post('/logout',
-    authController.logout
+    AuthController.logout
 );
 
 router.post('/logout-all-devices',
     AuthMiddleware.authenticate,
-    authController.logoutAllDevices
+    AuthController.logoutAllDevices
 );
 
 router.get('/profile',
     AuthMiddleware.authenticate,
-    authController.getProfile
+    AuthController.getProfile
 );
 
 router.put('/profile',
     AuthMiddleware.authenticate,
-    authController.updateProfile
+    AuthController.updateProfile
 );
 
 export default router;
