@@ -41,6 +41,79 @@ export const createContent = async (req: Request, res: Response): Promise<void> 
             return;
         }
 
+        // Handle time conversion and validation if scheduling
+        if (contentData.publishMode === 'schedule' && contentData.scheduleDate && contentData.scheduleTimes) {
+            const userTimezone = req.body.userTimezone || 'UTC';
+
+            // Get current UTC time
+            const now = new Date();
+            const currentUTC = now.toISOString();
+
+            // Use minimal buffer (10 seconds) for server validation
+            const bufferTime = new Date(now.getTime() + 10000); // 10 seconds buffer
+
+            Logger.info('🌍 Server Universal Timezone Validation', {
+                userTimezone,
+                scheduleDate: contentData.scheduleDate,
+                scheduleTimes: contentData.scheduleTimes,
+                currentUTC,
+                bufferTime: bufferTime.toISOString(),
+                serverTimezone: 'UTC',
+                validationMethod: 'Universal Timezone Match'
+            });
+
+            // Check each scheduled time against UTC
+            for (const scheduleTime of contentData.scheduleTimes) {
+                const scheduledDateTimeString = `${contentData.scheduleDate}T${scheduleTime}:00.000Z`;
+                const scheduledDateTime = new Date(scheduledDateTimeString);
+
+                // Calculate time difference in seconds
+                const timeDifferenceSeconds = (scheduledDateTime.getTime() - now.getTime()) / 1000;
+                const bufferDifferenceSeconds = (bufferTime.getTime() - scheduledDateTime.getTime()) / 1000;
+
+                Logger.info(`🕐 Validating schedule time: ${scheduleTime}`, {
+                    scheduledDateTime: scheduledDateTimeString,
+                    currentUTC,
+                    bufferTime: bufferTime.toISOString(),
+                    timeDifferenceSeconds: Math.round(timeDifferenceSeconds),
+                    bufferDifferenceSeconds: Math.round(bufferDifferenceSeconds),
+                    isValid: scheduledDateTime > bufferTime
+                });
+
+                // Compare with current UTC time + buffer
+                if (scheduledDateTime <= bufferTime) {
+                    Logger.warn('❌ SCHEDULE REJECTED: Past time detected', {
+                        scheduledDateTime: scheduledDateTimeString,
+                        currentUTC,
+                        bufferTime: bufferTime.toISOString(),
+                        userTimezone,
+                        timeDifferenceSeconds: Math.round(timeDifferenceSeconds),
+                        bufferDifferenceSeconds: Math.round(bufferDifferenceSeconds),
+                        reason: 'Scheduled time is too close to current time or in the past'
+                    });
+
+                    sendResponse(res, 400, false, 'Cannot schedule posts for past dates. Please select today or a future date.');
+                    return;
+                }
+
+                Logger.info('✅ Schedule time validation passed', {
+                    scheduleTime,
+                    scheduledDateTime: scheduledDateTimeString,
+                    currentUTC,
+                    timeDifferenceSeconds: Math.round(timeDifferenceSeconds),
+                    status: 'APPROVED'
+                });
+            }
+
+            Logger.info('🎉 All scheduled time validations passed - Universal Timezone Match', {
+                userTimezone,
+                scheduleDate: contentData.scheduleDate,
+                scheduleTimes: contentData.scheduleTimes,
+                currentUTC,
+                validationResult: 'SUCCESS'
+            });
+        }
+
         // Debug logging
         Logger.info('Creating content', {
             userId,
@@ -76,8 +149,7 @@ export const createContent = async (req: Request, res: Response): Promise<void> 
         if (content.publishMode === 'schedule' && content.scheduledPost) {
             responseData.scheduledPost = {
                 postNumber: content.scheduledPost.postNumber,
-                scheduledDate: content.scheduledPost.scheduledDate?.toISOString().split('T')[0],
-                scheduledTime: content.scheduledPost.scheduledTime
+                scheduledDateTime: content.scheduledPost.scheduledDateTime
             };
         }
 
@@ -130,28 +202,41 @@ export const getUserContent = async (req: Request, res: Response): Promise<void>
         Logger.info('Content retrieved', { contentsCount: contents.length, total });
 
         const responseData = {
-            contents: contents.map(content => ({
-                id: (content._id as any).toString(),
-                postType: content.postType,
-                content: content.content,
-                hashtags: content.hashtags,
-                mediaFile: content.mediaFile,
-                platforms: content.platforms,
-                publishMode: content.publishMode,
-                status: content.status,
-                publishedAt: content.publishedAt?.toISOString(),
-                createdAt: content.createdAt.toISOString(),
-                updatedAt: content.updatedAt.toISOString(),
-                scheduledPost: content.scheduledPost ? {
-                    postNumber: content.scheduledPost.postNumber,
-                    scheduledDate: content.scheduledPost.scheduledDate?.toISOString().split('T')[0],
-                    scheduledTime: content.scheduledPost.scheduledTime,
-                    status: content.scheduledPost.status,
-                    publishedAt: content.scheduledPost.publishedAt?.toISOString(),
-                    facebookPostId: content.scheduledPost.facebookPostId,
-                    error: content.scheduledPost.error
-                } : undefined
-            })),
+            contents: contents.map(content => {
+                // Extract scheduledDate and scheduledTime from scheduledDateTime
+                let scheduledDate: string | undefined;
+                let scheduledTime: string | undefined;
+
+                if (content.scheduledPost?.scheduledDateTime) {
+                    const scheduledDateTime = new Date(content.scheduledPost.scheduledDateTime);
+                    scheduledDate = scheduledDateTime.toISOString().split('T')[0]; // YYYY-MM-DD
+                    scheduledTime = scheduledDateTime.toISOString().split('T')[1].slice(0, 5); // HH:MM
+                }
+
+                return {
+                    id: (content._id as any).toString(),
+                    postType: content.postType,
+                    content: content.content,
+                    hashtags: content.hashtags,
+                    mediaFile: content.mediaFile,
+                    platforms: content.platforms,
+                    publishMode: content.publishMode,
+                    status: content.status,
+                    publishedAt: content.publishedAt?.toISOString(),
+                    createdAt: content.createdAt.toISOString(),
+                    updatedAt: content.updatedAt.toISOString(),
+                    scheduledPost: content.scheduledPost ? {
+                        postNumber: content.scheduledPost.postNumber,
+                        scheduledDateTime: content.scheduledPost.scheduledDateTime,
+                        scheduledDate: scheduledDate,
+                        scheduledTime: scheduledTime,
+                        status: content.scheduledPost.status,
+                        publishedAt: content.scheduledPost.publishedAt?.toISOString(),
+                        facebookPostId: content.scheduledPost.facebookPostId,
+                        error: content.scheduledPost.error
+                    } : undefined
+                };
+            }),
             total,
             page,
             limit
@@ -184,6 +269,16 @@ export const getContentById = async (req: Request, res: Response): Promise<void>
             return;
         }
 
+        // Extract scheduledDate and scheduledTime from scheduledDateTime
+        let scheduledDate: string | undefined;
+        let scheduledTime: string | undefined;
+
+        if (content.scheduledPost?.scheduledDateTime) {
+            const scheduledDateTime = new Date(content.scheduledPost.scheduledDateTime);
+            scheduledDate = scheduledDateTime.toISOString().split('T')[0]; // YYYY-MM-DD
+            scheduledTime = scheduledDateTime.toISOString().split('T')[1].slice(0, 5); // HH:MM
+        }
+
         const responseData = {
             id: (content._id as any).toString(),
             postType: content.postType,
@@ -198,8 +293,9 @@ export const getContentById = async (req: Request, res: Response): Promise<void>
             updatedAt: content.updatedAt.toISOString(),
             scheduledPost: content.scheduledPost ? {
                 postNumber: content.scheduledPost.postNumber,
-                scheduledDate: content.scheduledPost.scheduledDate?.toISOString().split('T')[0],
-                scheduledTime: content.scheduledPost.scheduledTime,
+                scheduledDateTime: content.scheduledPost.scheduledDateTime,
+                scheduledDate: scheduledDate,
+                scheduledTime: scheduledTime,
                 status: content.scheduledPost.status,
                 publishedAt: content.scheduledPost.publishedAt?.toISOString(),
                 facebookPostId: content.scheduledPost.facebookPostId,

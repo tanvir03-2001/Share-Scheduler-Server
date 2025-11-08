@@ -19,6 +19,10 @@ import facebookRoutes from './modules/facebook/facebook.routes';
 import userRoutes from './modules/user/user.routes';
 import homeRoutes from './routes/home.routes';
 
+// Import scheduling engine
+import { startSchedulingEngine } from './engines/scheduling';
+import schedulingRoutes from './engines/scheduling/scheduling.routes';
+
 // Load environment variables
 dotenv.config({ path: '.env' });
 
@@ -82,6 +86,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/content', contentRoutes);
 app.use('/api/facebook', facebookRoutes);
+app.use('/api/scheduling-engine', schedulingRoutes);
 
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -108,7 +113,11 @@ const startServer = async () => {
 
         app.listen(PORT, () => {
             console.log(`🚀 Server running on port ${PORT} (${process.env.NODE_ENV || 'development'})`);
-            console.log(`🌐 http://localhost:${PORT} | 🗄️ DB: Connected | ⏰ Scheduler: Started`);
+            console.log(`🌐 http://localhost:${PORT} | 🗄️ DB: Connected`);
+
+            // Start the scheduling engine
+            startSchedulingEngine();
+            console.log(`⏰ SCHEDULING ENGINE: Started and running`);
         });
     } catch (error) {
         console.error('Failed to start server:', error);

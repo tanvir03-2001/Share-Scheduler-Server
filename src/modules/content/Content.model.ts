@@ -28,8 +28,7 @@ export interface IMediaFile {
 
 export interface IScheduledPost {
     postNumber: number;
-    scheduledDate: Date;
-    scheduledTime: string;
+    scheduledDateTime: Date; // Combined date and time in UTC
     status: 'pending' | 'published' | 'failed';
     publishedAt?: Date;
     facebookPostId?: string;
@@ -75,12 +74,8 @@ const ScheduledPostSchema = new Schema<IScheduledPost>({
         type: Number,
         required: true
     },
-    scheduledDate: {
+    scheduledDateTime: {
         type: Date,
-        required: true
-    },
-    scheduledTime: {
-        type: String,
         required: true
     },
     status: {

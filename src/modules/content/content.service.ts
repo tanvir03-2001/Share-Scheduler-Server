@@ -20,11 +20,11 @@ export class ContentService {
             if (publishMode === 'schedule' && scheduleDate && scheduleTimes && scheduleTimes.length > 0) {
                 const validTimes = scheduleTimes.filter(time => time.trim() !== '');
                 if (validTimes.length > 0) {
-                    const startDate = new Date(scheduleDate);
+                    // Combine date and time into a single DateTime
+                    const scheduledDateTime = new Date(`${scheduleDate}T${validTimes[0]}:00.000Z`);
                     scheduledPost = {
                         postNumber: 1,
-                        scheduledDate: new Date(startDate),
-                        scheduledTime: validTimes[0], // Use first time since we only have one content now
+                        scheduledDateTime: scheduledDateTime,
                         status: 'pending' as const
                     };
                 }
@@ -227,8 +227,7 @@ export class ContentService {
 
                 scheduledPosts = validTimes.map((time, index) => ({
                     postNumber: index + 1,
-                    scheduledDate: new Date(startDate),
-                    scheduledTime: time,
+                    scheduledDateTime: new Date(`${scheduleDate}T${time}:00.000Z`),
                     status: 'pending' as const
                 }));
             }
@@ -283,30 +282,21 @@ export class ContentService {
 
     /**
      * Get scheduled posts that are ready to be published
+     * This method is used by the Scheduling Engine
      */
     static async getScheduledPostsToPublish(): Promise<IContent[]> {
         try {
             const now = new Date();
-            const currentTime = now.toTimeString().slice(0, 5); // HH:MM format
-            const currentDate = now.toISOString().split('T')[0]; // YYYY-MM-DD format
 
             const contents = await Content.find({
                 status: 'scheduled',
                 'scheduledPost.status': 'pending',
-                'scheduledPost.scheduledDate': {
-                    $lte: new Date(currentDate + 'T23:59:59.999Z')
+                'scheduledPost.scheduledDateTime': {
+                    $lte: now // Find posts scheduled for current time or earlier
                 }
             }).populate('userId', 'name email');
 
-            // Filter contents that have pending posts for current time or past time
-            const readyToPublish = contents.filter(content => {
-                return content.scheduledPost &&
-                    content.scheduledPost.status === 'pending' &&
-                    content.scheduledPost.scheduledDate.toISOString().split('T')[0] === currentDate &&
-                    content.scheduledPost.scheduledTime <= currentTime;
-            });
-
-            return readyToPublish;
+            return contents;
         } catch (error) {
             Logger.error('Error fetching scheduled posts to publish:', error);
             throw error;
@@ -315,6 +305,7 @@ export class ContentService {
 
     /**
      * Update scheduled post status
+     * This method is used by the Scheduling Engine
      */
     static async updateScheduledPostStatus(
         contentId: string,
