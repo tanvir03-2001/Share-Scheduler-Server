@@ -6,6 +6,7 @@ export interface CreateContentRequest {
     publishMode: 'now' | 'schedule';
     scheduleDate?: string;
     scheduleTimes?: string[];
+    selectedPageId?: string; // Facebook page ID
 }
 
 export interface CreateContentResponse {

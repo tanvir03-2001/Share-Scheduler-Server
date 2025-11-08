@@ -1,5 +1,6 @@
 import fetch from 'node-fetch';
 import { FacebookPage } from '../modules/facebook/FacebookPage.model';
+import { Logger } from '../utils/logger';
 import { RetryUtil } from '../utils/retry.util';
 
 export interface FacebookPageData {
@@ -549,6 +550,35 @@ export class FacebookService {
         }
 
         return await response.json();
+    }
+
+    /**
+     * Get page ID from a Facebook post ID
+     * This helps verify which page a post belongs to
+     */
+    async getPageIdFromPostId(postId: string, accessToken: string): Promise<string | null> {
+        try {
+            // Query Facebook API to get the page that owns this post
+            const url = `https://graph.facebook.com/v18.0/${postId}?fields=from&access_token=${accessToken}`;
+
+            const response = await fetch(url);
+            const result = await response.json() as any;
+
+            if (result.error) {
+                Logger.error('Facebook API error getting post page:', result.error);
+                return null;
+            }
+
+            // The 'from' field contains the page ID
+            if (result.from && result.from.id) {
+                return result.from.id;
+            }
+
+            return null;
+        } catch (error) {
+            Logger.error('Error getting page ID from post ID:', error);
+            return null;
+        }
     }
 
     /**

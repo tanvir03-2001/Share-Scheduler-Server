@@ -12,7 +12,7 @@ export class ContentService {
      */
     static async createContent(userId: string, contentData: CreateContentRequest & { mediaFiles?: any[] }): Promise<IContent> {
         try {
-            const { postType, content, hashtags, platforms, publishMode, scheduleDate, scheduleTimes, mediaFiles } = contentData;
+            const { postType, content, hashtags, platforms, publishMode, scheduleDate, scheduleTimes, mediaFiles, selectedPageId } = contentData;
 
             // Generate scheduled post if publishMode is 'schedule'
             let scheduledPost: IScheduledPost | undefined;
@@ -36,6 +36,7 @@ export class ContentService {
             const userIdObjectId = new mongoose.Types.ObjectId(userId);
             const newContent = new Content({
                 userId: userIdObjectId,
+                pageId: selectedPageId, // Store the selected page ID
                 postType,
                 content,
                 hashtags,
@@ -145,37 +146,125 @@ export class ContentService {
         page: number = 1,
         limit: number = 10,
         status?: string,
-        postType?: string
+        postType?: string,
+        pageId?: string
     ): Promise<{ contents: IContent[], total: number }> {
         try {
-            Logger.info('ContentService.getUserContent called', { userId, page, limit, status, postType });
+            Logger.info('ContentService.getUserContent called', { userId, page, limit, status, postType, pageId });
 
             // Convert userId string to ObjectId
             const userIdObjectId = new mongoose.Types.ObjectId(userId);
-            const query: any = { userId: userIdObjectId };
+
+            // Build base query
+            const baseQuery: any = { userId: userIdObjectId };
 
             if (status) {
-                query.status = status;
+                baseQuery.status = status;
             }
 
             if (postType) {
-                query.postType = postType;
+                baseQuery.postType = postType;
             }
 
-            Logger.info('Database query', { query });
+            // Filter by pageId if provided
+            // First, get content with matching pageId OR content without pageId (to verify via facebookPostId)
+            let query: any;
+            if (pageId) {
+                query = {
+                    ...baseQuery,
+                    $or: [
+                        { pageId: pageId },
+                        {
+                            $and: [
+                                {
+                                    $or: [
+                                        { pageId: { $exists: false } },
+                                        { pageId: null },
+                                        { pageId: '' }
+                                    ]
+                                },
+                                { 'scheduledPost.facebookPostId': { $exists: true, $ne: null } }
+                            ]
+                        }
+                    ]
+                };
+            } else {
+                query = baseQuery;
+            }
+
+            Logger.info('Database query', { query: JSON.stringify(query, null, 2) });
 
             const skip = (page - 1) * limit;
 
             Logger.info('About to execute database queries', { skip, limit });
 
-            const [contents, total] = await Promise.all([
-                Content.find(query)
-                    .sort({ createdAt: -1 })
-                    .skip(skip)
-                    .limit(limit)
-                    .lean() as unknown as IContent[],
-                Content.countDocuments(query)
-            ]);
+            let contents = await Content.find(query)
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit * 2) // Get more to filter later
+                .lean() as unknown as IContent[];
+
+            Logger.info('Initial content fetched', { contentsCount: contents.length });
+
+            // If pageId is provided, filter content by verifying facebookPostId belongs to the page
+            if (pageId && contents.length > 0) {
+                const { FacebookService } = await import('../../services/facebook.service');
+                const { FacebookUser } = await import('../facebook/FacebookUser.model');
+                const facebookService = new FacebookService();
+
+                // Get user's Facebook access token to verify posts
+                const facebookUser = await FacebookUser.findOne({ userId: userIdObjectId, isActive: true }).lean();
+                const userAccessToken = facebookUser?.accessToken;
+
+                // Filter content: keep content with matching pageId or verify via facebookPostId
+                const filteredContents = [];
+
+                for (const content of contents) {
+                    // If content has matching pageId, include it
+                    if (content.pageId === pageId) {
+                        filteredContents.push(content);
+                        continue;
+                    }
+
+                    // If content doesn't have pageId but has facebookPostId, verify it belongs to selected page
+                    if (!content.pageId && content.scheduledPost?.facebookPostId && userAccessToken) {
+                        try {
+                            // Verify which page this post belongs to via Facebook API
+                            const postPageId = await facebookService.getPageIdFromPostId(
+                                content.scheduledPost.facebookPostId,
+                                userAccessToken
+                            );
+
+                            // If the post belongs to the selected page, include it
+                            if (postPageId === pageId) {
+                                // Update the content with the correct pageId for future queries
+                                await Content.findByIdAndUpdate(content._id, { pageId: pageId }, { new: false });
+                                filteredContents.push(content);
+                                Logger.info('Content pageId updated from facebookPostId verification', {
+                                    contentId: content._id,
+                                    pageId: pageId
+                                });
+                            }
+                        } catch (error) {
+                            Logger.error('Error verifying post page:', error);
+                            // Skip this content if verification fails
+                            continue;
+                        }
+                    }
+                }
+
+                contents = filteredContents.slice(0, limit);
+                Logger.info('Content filtered by pageId', {
+                    beforeFilter: contents.length + (limit * 2 - contents.length),
+                    afterFilter: contents.length
+                });
+            } else {
+                // If no pageId filter, just limit the results
+                contents = contents.slice(0, limit);
+            }
+
+            // Get total count for pagination
+            const total = await Content.countDocuments(query);
 
             Logger.info('Database queries completed', { contentsCount: contents.length, total });
 

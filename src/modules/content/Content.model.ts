@@ -2,6 +2,7 @@ import mongoose, { Document, Schema } from 'mongoose';
 
 export interface IContent extends Document {
     userId: mongoose.Types.ObjectId;
+    pageId?: string; // Facebook page ID associated with this content
     postType: 'text' | 'image' | 'reel' | 'story';
     content: string;
     hashtags?: string;
@@ -100,6 +101,10 @@ const ContentSchema = new Schema<IContent>({
         ref: 'User',
         required: true
     },
+    pageId: {
+        type: String,
+        required: false
+    },
     postType: {
         type: String,
         enum: ['text', 'image', 'reel', 'story'],
@@ -160,6 +165,7 @@ ContentSchema.index({ userId: 1, createdAt: -1 });
 ContentSchema.index({ status: 1 });
 ContentSchema.index({ 'scheduledPost.scheduledDate': 1, 'scheduledPost.status': 1 });
 ContentSchema.index({ postType: 1 });
+ContentSchema.index({ pageId: 1 }); // Index for page-based filtering
 
 // Pre-save middleware
 ContentSchema.pre('save', function (next) {

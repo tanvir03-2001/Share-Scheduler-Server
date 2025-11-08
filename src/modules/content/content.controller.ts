@@ -35,6 +35,10 @@ export const createContent = async (req: Request, res: Response): Promise<void> 
             if (typeof contentData.scheduleTimes === 'string') {
                 contentData.scheduleTimes = JSON.parse(contentData.scheduleTimes);
             }
+            // Handle selectedPageId from FormData
+            if (req.body.selectedPageId && !contentData.selectedPageId) {
+                contentData.selectedPageId = req.body.selectedPageId;
+            }
         } catch (error) {
             Logger.error('Error parsing JSON fields:', error);
             sendResponse(res, 400, false, 'Invalid JSON format for platforms or scheduleTimes');
@@ -188,15 +192,17 @@ export const getUserContent = async (req: Request, res: Response): Promise<void>
         const limit = parseInt(req.query.limit as string) || 10;
         const status = req.query.status as string;
         const postType = req.query.postType as string;
+        const pageId = req.query.pageId as string;
 
-        Logger.info('getUserContent called', { userId, page, limit, status, postType });
+        Logger.info('getUserContent called', { userId, page, limit, status, postType, pageId });
 
         const { contents, total } = await ContentService.getUserContent(
             userId,
             page,
             limit,
             status,
-            postType
+            postType,
+            pageId
         );
 
         Logger.info('Content retrieved', { contentsCount: contents.length, total });
