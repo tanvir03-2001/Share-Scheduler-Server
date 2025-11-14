@@ -4,6 +4,19 @@ import { CreateContentRequest, UpdateContentRequest } from './content.types';
 export const validateCreateContent = (req: Request, res: Response, next: NextFunction) => {
     let { postType, content, platforms, publishMode, scheduleDate, scheduleTimes } = req.body as CreateContentRequest;
 
+    // Log incoming data for debugging
+    console.log('📥 Validating content creation request:', {
+        postType,
+        hasContent: !!content,
+        contentLength: content?.length || 0,
+        platforms: typeof platforms === 'string' ? platforms : platforms,
+        publishMode,
+        scheduleDate,
+        scheduleTimes: typeof scheduleTimes === 'string' ? scheduleTimes : scheduleTimes,
+        hasFiles: req.files && Array.isArray(req.files) && req.files.length > 0,
+        fileCount: req.files && Array.isArray(req.files) ? req.files.length : 0
+    });
+
     // Parse JSON strings for FormData fields
     try {
         if (typeof platforms === 'string') {
@@ -13,6 +26,7 @@ export const validateCreateContent = (req: Request, res: Response, next: NextFun
             scheduleTimes = JSON.parse(scheduleTimes);
         }
     } catch (error) {
+        console.error('❌ JSON parsing error:', error);
         return res.status(400).json({
             success: false,
             message: 'Invalid JSON format for platforms or scheduleTimes'
@@ -38,7 +52,10 @@ export const validateCreateContent = (req: Request, res: Response, next: NextFun
     const hasMediaFiles = req.files && Array.isArray(req.files) && req.files.length > 0;
     const isMediaPost = ['image', 'reel', 'story'].includes(postType);
 
-    if (!content || content.trim().length === 0) {
+    // Handle content validation - content can be undefined, null, or empty string
+    const contentIsEmpty = !content || (typeof content === 'string' && content.trim().length === 0);
+    
+    if (contentIsEmpty) {
         if (postType === 'text') {
             return res.status(400).json({
                 success: false,
@@ -51,6 +68,17 @@ export const validateCreateContent = (req: Request, res: Response, next: NextFun
             });
         }
     }
+    
+    // Normalize content - set to empty string if undefined/null for media posts
+    if (!content && isMediaPost && hasMediaFiles) {
+        content = '';
+        req.body.content = ''; // Update req.body so controller can use it
+    }
+
+    // Update req.body with parsed values
+    req.body.platforms = platforms;
+    req.body.scheduleTimes = scheduleTimes;
+    req.body.content = content || '';
 
     if (!platforms || !Array.isArray(platforms) || platforms.length === 0) {
         return res.status(400).json({
@@ -110,12 +138,19 @@ export const validateCreateContent = (req: Request, res: Response, next: NextFun
             });
         }
 
-        // Check if scheduled date is not in the past
-        const scheduledDate = new Date(scheduleDate);
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        // Check if scheduled date is not in the past (using UTC)
+        // scheduleDate is already in UTC format (YYYY-MM-DD)
+        // Compare with current UTC date
+        const scheduledDateUTC = new Date(`${scheduleDate}T00:00:00.000Z`);
+        const nowUTC = new Date();
+        const todayUTC = new Date(Date.UTC(
+            nowUTC.getUTCFullYear(),
+            nowUTC.getUTCMonth(),
+            nowUTC.getUTCDate(),
+            0, 0, 0, 0
+        ));
 
-        if (scheduledDate < today) {
+        if (scheduledDateUTC < todayUTC) {
             return res.status(400).json({
                 success: false,
                 message: 'Cannot schedule posts for past dates. Please select today or a future date.'
@@ -123,8 +158,8 @@ export const validateCreateContent = (req: Request, res: Response, next: NextFun
         }
     }
 
-    // Validate content length
-    if (content.length > 2000) {
+    // Validate content length (only if content is provided)
+    if (content && typeof content === 'string' && content.length > 2000) {
         return res.status(400).json({
             success: false,
             message: 'Content cannot exceed 2000 characters'
