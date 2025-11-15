@@ -163,17 +163,54 @@ export const createContent = async (req: Request, res: Response): Promise<void> 
 
         // Provide more specific error messages
         let errorMessage = 'Failed to create content';
+        let statusCode = 500;
+        
         if (error instanceof Error) {
-            if (error.message.includes('validation')) {
+            const errorMsg = error.message.toLowerCase();
+            
+            // Timezone/date validation errors
+            if (errorMsg.includes('past') || errorMsg.includes('time') || errorMsg.includes('date') || errorMsg.includes('schedule')) {
+                errorMessage = error.message || 'Invalid schedule time. Please select a future date and time.';
+                statusCode = 400;
+            }
+            // Validation errors
+            else if (errorMsg.includes('validation')) {
                 errorMessage = 'Content validation failed. Please check your input.';
-            } else if (error.message.includes('Facebook')) {
+                statusCode = 400;
+            }
+            // Facebook API errors
+            else if (errorMsg.includes('facebook')) {
                 errorMessage = 'Failed to publish to Facebook. Please check your Facebook connection.';
-            } else if (error.message.includes('upload')) {
+                statusCode = 502;
+            }
+            // File upload errors
+            else if (errorMsg.includes('upload') || errorMsg.includes('file')) {
                 errorMessage = 'File upload failed. Please try again.';
+                statusCode = 400;
+            }
+            // Authentication errors
+            else if (errorMsg.includes('unauthorized') || errorMsg.includes('token') || errorMsg.includes('auth')) {
+                errorMessage = 'Authentication failed. Please log in again.';
+                statusCode = 401;
+            }
+            // Database errors
+            else if (errorMsg.includes('database') || errorMsg.includes('mongodb') || errorMsg.includes('connection')) {
+                errorMessage = 'Database connection error. Please try again later.';
+                statusCode = 503;
+            }
+            // Use the original error message if it's descriptive
+            else if (error.message && error.message.length > 0 && error.message.length < 200) {
+                errorMessage = error.message;
             }
         }
 
-        sendResponse(res, 500, false, errorMessage);
+        Logger.warn('Sending error response:', {
+            statusCode,
+            errorMessage,
+            errorType: error instanceof Error ? error.constructor.name : typeof error
+        });
+
+        sendResponse(res, statusCode, false, errorMessage);
     }
 }
 
